@@ -10,7 +10,7 @@ import StudentDetails from './components/StudentDetails';
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
 import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords } from './firebase';
 import { getSampleRecords } from './samples';
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, Download, Smartphone, Share, X, PlusSquare } from 'lucide-react';
 
 export default function App() {
   // Session & UI States
@@ -35,10 +35,68 @@ export default function App() {
   const [selectedProgram, setSelectedProgram] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
 
+  // PWA Install states
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
+  const [isIOS, setIsIOS] = useState<boolean>(false);
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+
   // Sync preference
   useEffect(() => {
     localStorage.setItem('aiou_theme', theme);
   }, [theme]);
+
+  // Handle PWA Event Listeners
+  useEffect(() => {
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || 
+                             (window.navigator as any).standalone === true;
+    setIsStandalone(isStandaloneMode);
+
+    // Detect iOS
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      if (!isStandaloneMode) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (ios && !isStandaloneMode) {
+      const dismissed = localStorage.getItem('aiou_pwa_ios_dismissed') === 'true';
+      if (!dismissed) {
+        const timer = setTimeout(() => {
+          setShowInstallBanner(true);
+        }, 3500);
+        return () => clearTimeout(timer);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User prompt decision: ${outcome}`);
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    }
+  };
+
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    if (isIOS) {
+      localStorage.setItem('aiou_pwa_ios_dismissed', 'true');
+    }
+  };
 
   // Load records and seed if empty
   const loadData = async () => {
@@ -275,6 +333,71 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Modern, elegant Floating PWA Mobile Install Banner */}
+      {showInstallBanner && !isStandalone && (
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md bg-white/95 backdrop-blur-md border border-emerald-100 rounded-2xl shadow-xl p-5 z-50 animate-fade-in transition-all duration-300">
+          <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-xl ${isGreen ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'} shrink-0`}>
+              <Smartphone size={24} />
+            </div>
+            
+            <div className="flex-1">
+              <div className="flex items-start justify-between">
+                <h4 className="text-sm font-extrabold text-gray-900">
+                  Install AIOU Portal Mobile App
+                </h4>
+                <button 
+                  onClick={handleDismissInstall}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                {isIOS 
+                  ? "Access your student directory instantly from your home screen. Tap the Share icon on your browser and select 'Add to Home Screen'!"
+                  : "Install our lightweight mobile application directly onto your device for offline support, fast loading, and an immersive native experience!"
+                }
+              </p>
+
+              <div className="mt-4 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={handleDismissInstall}
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Maybe Later
+                </button>
+                
+                {!isIOS ? (
+                  <button
+                    onClick={handleInstallClick}
+                    className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white shadow-xs transition-all cursor-pointer ${
+                      isGreen 
+                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' 
+                        : 'bg-sky-600 hover:bg-sky-700 shadow-sky-200'
+                    }`}
+                  >
+                    <Download size={14} />
+                    <span>Install App</span>
+                  </button>
+                ) : (
+                  <div className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-extrabold ${
+                    isGreen ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'
+                  }`}>
+                    <Share size={12} />
+                    <span>Tap Share</span>
+                    <span>→</span>
+                    <PlusSquare size={12} />
+                    <span>Add to Home Screen</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
