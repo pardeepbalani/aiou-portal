@@ -3,7 +3,11 @@ const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
   "/manifest.json",
-  "/app_icon.jpg"
+  "/app_icon_192.png",
+  "/app_icon_512.png",
+  "/app_icon_maskable.png",
+  "/screenshot_desktop.png",
+  "/screenshot_mobile.png"
 ];
 
 // Install Event
