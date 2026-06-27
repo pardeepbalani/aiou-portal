@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "StudentRecord": {
+      "title": "StudentRecord",
+      "description": "Student record details including personal info, academic semesters, payments and services",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "studentName": {
+          "type": "string"
+        },
+        "fatherName": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "registrationId": {
+          "type": "string"
+        },
+        "lmsPasswordId": {
+          "type": "string"
+        },
+        "cmsPasswordId": {
+          "type": "string"
+        },
+        "admissionYear": {
+          "type": "string"
+        },
+        "programSelected": {
+          "type": "string"
+        },
+        "semesterType": {
+          "type": "string",
+          "enum": ["Autumn", "Spring"]
+        },
+        "semesters": {
+          "type": "array"
+        },
+        "totalReceivable": {
+          "type": "number"
+        },
+        "paymentsList": {
+          "type": "array"
+        },
+        "serviceChargesAmount": {
+          "type": "number"
+        },
+        "remarks": {
+          "type": "string"
+        },
+        "serviceEnrollment": {
+          "type": "boolean"
+        },
+        "serviceWorkshops": {
+          "type": "boolean"
+        },
+        "serviceQuiz": {
+          "type": "boolean"
+        },
+        "serviceAssignments": {
+          "type": "boolean"
+        },
+        "servicePhysicalWorkshop": {
+          "type": "boolean"
+        },
+        "serviceResearchReport": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed", "suspended"]
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "studentName",
+        "fatherName",
+        "phoneNumber",
+        "registrationId",
+        "lmsPasswordId",
+        "cmsPasswordId",
+        "admissionYear",
+        "programSelected",
+        "semesterType",
+        "semesters",
+        "totalReceivable",
+        "paymentsList",
+        "serviceEnrollment",
+        "serviceWorkshops",
+        "serviceQuiz",
+        "serviceAssignments",
+        "servicePhysicalWorkshop",
+        "serviceResearchReport",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/students_records/{studentId}": {
+      "schema": "StudentRecord",
+      "description": "Collection storing student profiles, registration numbers, academic logs, and accounts"
+    }
+  }
+}

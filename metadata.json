@@ -1,0 +1,6 @@
+{
+  "name": "AIOU Students Record",
+  "description": "An enrollment and management record system for AIOU students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net - deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ID verification to prevent long strings or ID poisoning
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Hardened validation function representing the StudentRecord schema
+    function isValidStudentRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.studentName is string && data.studentName.size() <= 256
+        && data.fatherName is string && data.fatherName.size() <= 256
+        && data.phoneNumber is string && data.phoneNumber.size() <= 32
+        && data.registrationId is string && data.registrationId.size() <= 128
+        && data.lmsPasswordId is string && data.lmsPasswordId.size() <= 128
+        && data.cmsPasswordId is string && data.cmsPasswordId.size() <= 128
+        && data.admissionYear is string && data.admissionYear.size() <= 16
+        && data.programSelected is string && data.programSelected.size() <= 128
+        && (data.semesterType == 'Autumn' || data.semesterType == 'Spring')
+        && data.semesters is list
+        && (data.totalReceivable is int || data.totalReceivable is float)
+        && data.paymentsList is list
+        && (!('serviceChargesAmount' in data) || data.serviceChargesAmount is int || data.serviceChargesAmount is float)
+        && (!('remarks' in data) || (data.remarks is string && data.remarks.size() <= 5000))
+        && data.serviceEnrollment is bool
+        && data.serviceWorkshops is bool
+        && data.serviceQuiz is bool
+        && data.serviceAssignments is bool
+        && data.servicePhysicalWorkshop is bool
+        && data.serviceResearchReport is bool
+        && (data.status == 'active' || data.status == 'completed' || data.status == 'suspended')
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    // Rules for students_records collection
+    match /students_records/{studentId} {
+      // Public read operations are allowed with ID validation
+      allow get: if isValidId(studentId);
+      allow list: if true;
+
+      // Create operations are validated against ID structure and Schema structure
+      allow create: if isValidId(studentId)
+        && incoming().id == studentId
+        && isValidStudentRecord(incoming());
+
+      // Update operations are validated against ID structure, Schema structure, and Immutability constraints
+      allow update: if isValidId(studentId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidStudentRecord(incoming());
+
+      // Delete operations are protected with ID validation
+      allow delete: if isValidId(studentId);
+    }
+  }
+}
