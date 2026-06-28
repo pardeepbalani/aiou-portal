@@ -104,12 +104,64 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "ExamManager": {
+      "title": "ExamManager",
+      "description": "Information about exam managers for specific exam centres",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "centre": { "type": "string", "enum": ["Mithi", "Diplo"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone", "email", "centre", "createdAt", "updatedAt"]
+    },
+    "StudentExamInfo": {
+      "title": "StudentExamInfo",
+      "description": "Student details for exam schedules, payment details, and dates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "centre": { "type": "string", "enum": ["Mithi", "Diplo"] },
+        "managerId": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "studentName": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "studentId": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "semesterTerm": { "type": "string" },
+        "courseCodes": { "type": "array" },
+        "examDates": { "type": "array" },
+        "totalFee": { "type": "number" },
+        "amountReceived": { "type": "number" },
+        "remainingBalance": { "type": "number" },
+        "paymentHistory": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": [
+        "id", "centre", "managerId", "courseCode", "studentName", "fatherName", 
+        "studentId", "contactNumber", "semesterTerm", "courseCodes", "examDates", 
+        "totalFee", "amountReceived", "remainingBalance", "paymentHistory", "createdAt", "updatedAt"
+      ]
     }
   },
   "firestore": {
     "/students_records/{studentId}": {
       "schema": "StudentRecord",
       "description": "Collection storing student profiles, registration numbers, academic logs, and accounts"
+    },
+    "/exam_managers/{managerId}": {
+      "schema": "ExamManager",
+      "description": "Collection storing details of exam managers assigned to centres"
+    },
+    "/exam_records/{recordId}": {
+      "schema": "StudentExamInfo",
+      "description": "Collection storing examination schedules and payment logs for students"
     }
   }
 }

@@ -19,6 +19,7 @@ import { StudentRecord } from '../types';
 interface DashboardProps {
   onSelectEnroll: () => void;
   onSelectPrevious: () => void;
+  onSelectExamRecords: () => void;
   theme: 'green' | 'blue';
   stats: {
     totalStudents: number;
@@ -32,6 +33,7 @@ interface DashboardProps {
 export default function Dashboard({
   onSelectEnroll,
   onSelectPrevious,
+  onSelectExamRecords,
   theme,
   stats,
   records,
@@ -206,7 +208,7 @@ export default function Dashboard({
       </div>
 
       {/* Main Call to Action Grid */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-3 gap-6">
         {/* Enroll Card */}
         <button
           onClick={onSelectEnroll}
@@ -250,6 +252,29 @@ export default function Dashboard({
           </h3>
           <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
             Advanced multi-attribute filters, full transaction tracking ledger, print grade sheets, download Excel spreadsheets, and edit active records.
+          </p>
+        </button>
+
+        {/* Exam Records */}
+        <button
+          onClick={onSelectExamRecords}
+          id="dashboard-exam-records-button"
+          className={`flex flex-col items-center md:items-start md:text-left p-6 bg-white border rounded-2xl cursor-pointer group hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${
+            isGreen
+              ? 'border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/10'
+              : 'border-sky-100 hover:border-sky-300 hover:bg-sky-50/10'
+          }`}
+        >
+          <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
+            isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
+          }`}>
+            <GraduationCap size={28} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 group-hover:text-purple-700 transition-colors">
+            Exam Records
+          </h3>
+          <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
+            Manage Exam Centres (Mithi/Diplo), assign Exam Managers, schedule course paper dates, track fees, and receive reminders.
           </p>
         </button>
       </div>

@@ -48,6 +48,38 @@ service cloud.firestore {
         && data.updatedAt is string;
     }
 
+    // Hardened validation function representing the ExamManager schema
+    function isValidExamManager(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 256
+        && data.phone is string && data.phone.size() <= 32
+        && data.email is string && data.email.size() <= 256
+        && (data.centre == 'Mithi' || data.centre == 'Diplo')
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    // Hardened validation function representing the StudentExamInfo schema
+    function isValidStudentExamInfo(data) {
+      return data.id is string && data.id.size() <= 128
+        && (data.centre == 'Mithi' || data.centre == 'Diplo')
+        && data.managerId is string && data.managerId.size() <= 128
+        && data.courseCode is string && data.courseCode.size() <= 128
+        && data.studentName is string && data.studentName.size() <= 256
+        && data.fatherName is string && data.fatherName.size() <= 256
+        && data.studentId is string && data.studentId.size() <= 128
+        && data.contactNumber is string && data.contactNumber.size() <= 32
+        && data.semesterTerm is string && data.semesterTerm.size() <= 128
+        && data.courseCodes is list
+        && data.examDates is list
+        && (data.totalFee is int || data.totalFee is float)
+        && (data.amountReceived is int || data.amountReceived is float)
+        && (data.remainingBalance is int || data.remainingBalance is float)
+        && data.paymentHistory is list
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
     // Rules for students_records collection
     match /students_records/{studentId} {
       // Public read operations are allowed with ID validation
@@ -67,6 +99,40 @@ service cloud.firestore {
 
       // Delete operations are protected with ID validation
       allow delete: if isValidId(studentId);
+    }
+
+    // Rules for exam_managers collection
+    match /exam_managers/{managerId} {
+      allow get: if isValidId(managerId);
+      allow list: if true;
+
+      allow create: if isValidId(managerId)
+        && incoming().id == managerId
+        && isValidExamManager(incoming());
+
+      allow update: if isValidId(managerId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidExamManager(incoming());
+
+      allow delete: if isValidId(managerId);
+    }
+
+    // Rules for exam_records collection
+    match /exam_records/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidStudentExamInfo(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidStudentExamInfo(incoming());
+
+      allow delete: if isValidId(recordId);
     }
   }
 }

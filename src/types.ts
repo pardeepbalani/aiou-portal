@@ -64,6 +64,50 @@ export interface StudentRecord {
   updatedAt: string;
 }
 
+export interface ExamManager {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  centre: 'Mithi' | 'Diplo';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExamPaymentHistory {
+  id: string;
+  date: string;
+  amount: number;
+}
+
+export interface CourseExamDate {
+  courseCode: string;
+  examDate: string;
+}
+
+export interface StudentExamInfo {
+  id: string;
+  centre: 'Mithi' | 'Diplo';
+  managerId: string;
+  courseCode: string; // Selected course
+  studentName: string;
+  fatherName: string;
+  studentId: string;
+  contactNumber: string;
+  semesterTerm: string;
+  courseCodes: string[];
+  examDates: CourseExamDate[];
+  
+  // Payment Management Section
+  totalFee: number;
+  amountReceived: number;
+  remainingBalance: number;
+  paymentHistory: ExamPaymentHistory[];
+
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const PROGRAM_SEMESTERS_MAP: Record<string, number> = {
   'B.Ed (1.5 Years)': 3,
   'B.Ed (2.5 Years)': 5,

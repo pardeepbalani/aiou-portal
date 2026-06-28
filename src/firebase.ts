@@ -11,7 +11,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -313,6 +313,212 @@ export async function deleteStudentRecord(id: string): Promise<void> {
     console.error('Firestore delete failed:', error);
     if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.DELETE, `${COLLECTION_NAME}/${id}`);
+    }
+  }
+}
+
+const EXAM_MANAGERS_COLLECTION = 'exam_managers';
+const EXAM_RECORDS_COLLECTION = 'exam_records';
+
+const LOCAL_EXAM_MANAGERS_KEY = 'aiou_local_exam_managers';
+const LOCAL_EXAM_RECORDS_KEY = 'aiou_local_exam_records';
+
+export function getLocalExamManagers(): ExamManager[] {
+  try {
+    const data = localStorage.getItem(LOCAL_EXAM_MANAGERS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Failed to load local exam managers:', error);
+    return [];
+  }
+}
+
+export function saveLocalExamManagers(managers: ExamManager[]) {
+  try {
+    localStorage.setItem(LOCAL_EXAM_MANAGERS_KEY, JSON.stringify(managers));
+  } catch (error) {
+    console.error('Failed to save local exam managers:', error);
+  }
+}
+
+export function getLocalExamRecords(): StudentExamInfo[] {
+  try {
+    const data = localStorage.getItem(LOCAL_EXAM_RECORDS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Failed to load local exam records:', error);
+    return [];
+  }
+}
+
+export function saveLocalExamRecords(records: StudentExamInfo[]) {
+  try {
+    localStorage.setItem(LOCAL_EXAM_RECORDS_KEY, JSON.stringify(records));
+  } catch (error) {
+    console.error('Failed to save local exam records:', error);
+  }
+}
+
+export async function saveExamManager(manager: ExamManager): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedManager = {
+    ...manager,
+    updatedAt: now,
+    createdAt: manager.createdAt || now
+  };
+
+  const local = getLocalExamManagers();
+  const index = local.findIndex(m => m.id === updatedManager.id);
+  if (index >= 0) {
+    local[index] = updatedManager;
+  } else {
+    local.push(updatedManager);
+  }
+  saveLocalExamManagers(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, EXAM_MANAGERS_COLLECTION, updatedManager.id);
+    await setDoc(docRef, updatedManager);
+  } catch (error) {
+    console.warn('Firestore write failed for Exam Manager, using local fallback. Error:', error);
+    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.WRITE, `${EXAM_MANAGERS_COLLECTION}/${updatedManager.id}`);
+    }
+  }
+}
+
+export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
+  let remoteRecords: ExamManager[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, EXAM_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        remoteRecords.push(data as ExamManager);
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Exam Managers. Reading local records only.', error);
+    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.GET, EXAM_MANAGERS_COLLECTION);
+    }
+    return getLocalExamManagers();
+  }
+
+  const local = getLocalExamManagers();
+  const mergedMap = new Map<string, ExamManager>();
+  local.forEach(m => mergedMap.set(m.id, m));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalExamManagers(merged);
+  return merged;
+}
+
+export async function deleteExamManager(id: string): Promise<void> {
+  const local = getLocalExamManagers();
+  const updated = local.filter(m => m.id !== id);
+  saveLocalExamManagers(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, EXAM_MANAGERS_COLLECTION, id));
+  } catch (error) {
+    console.error('Firestore delete failed for Exam Manager:', error);
+    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.DELETE, `${EXAM_MANAGERS_COLLECTION}/${id}`);
+    }
+  }
+}
+
+export async function saveStudentExamInfo(record: StudentExamInfo): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  const local = getLocalExamRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalExamRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, EXAM_RECORDS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+  } catch (error) {
+    console.warn('Firestore write failed for Student Exam Info, using local fallback. Error:', error);
+    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.WRITE, `${EXAM_RECORDS_COLLECTION}/${updatedRecord.id}`);
+    }
+  }
+}
+
+export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]> {
+  let remoteRecords: StudentExamInfo[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, EXAM_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        remoteRecords.push(data as StudentExamInfo);
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Student Exam Infos. Reading local records only.', error);
+    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.GET, EXAM_RECORDS_COLLECTION);
+    }
+    return getLocalExamRecords();
+  }
+
+  const local = getLocalExamRecords();
+  const mergedMap = new Map<string, StudentExamInfo>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalExamRecords(merged);
+  return merged;
+}
+
+export async function deleteStudentExamInfo(id: string): Promise<void> {
+  const local = getLocalExamRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalExamRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, EXAM_RECORDS_COLLECTION, id));
+  } catch (error) {
+    console.error('Firestore delete failed for Student Exam Info:', error);
+    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+      handleFirestoreError(error, OperationType.DELETE, `${EXAM_RECORDS_COLLECTION}/${id}`);
     }
   }
 }
