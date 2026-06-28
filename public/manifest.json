@@ -33,10 +33,42 @@
   ],
   "scope_extensions": [
     {
+      "origin": "https://aiou-portal-taupe.vercel.app"
+    },
+    {
       "origin": "https://*.aiou-portal-taupe.vercel.app"
     },
     {
+      "origin": "https://vercel.app"
+    },
+    {
       "origin": "https://*.vercel.app"
+    },
+    {
+      "origin": "https://*.run.app"
+    },
+    {
+      "origin": "https://*.asia-southeast1.run.app"
+    }
+  ],
+  "scopeExtensions": [
+    {
+      "origin": "https://aiou-portal-taupe.vercel.app"
+    },
+    {
+      "origin": "https://*.aiou-portal-taupe.vercel.app"
+    },
+    {
+      "origin": "https://vercel.app"
+    },
+    {
+      "origin": "https://*.vercel.app"
+    },
+    {
+      "origin": "https://*.run.app"
+    },
+    {
+      "origin": "https://*.asia-southeast1.run.app"
     }
   ],
   "launch_handler": {
