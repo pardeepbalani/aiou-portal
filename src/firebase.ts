@@ -40,6 +40,36 @@ export enum OperationType {
   WRITE = 'write',
 }
 
+let quotaExceededFlag = false;
+
+export function isQuotaExceeded(): boolean {
+  if (quotaExceededFlag) return true;
+  return localStorage.getItem('aiou_quota_exceeded') === 'true';
+}
+
+export function setQuotaExceeded(exceeded: boolean) {
+  quotaExceededFlag = exceeded;
+  if (exceeded) {
+    localStorage.setItem('aiou_quota_exceeded', 'true');
+  } else {
+    localStorage.removeItem('aiou_quota_exceeded');
+  }
+}
+
+export function isQuotaError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('quota') ||
+    msg.includes('exhausted') ||
+    msg.includes('limit') ||
+    msg.includes('billing') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('resource exhausted')
+  );
+}
+
 export interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
@@ -206,9 +236,12 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
     await ensureAuthenticated();
     const docRef = doc(db, COLLECTION_NAME, updatedRecord.id);
     await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.warn('Firestore write failed, using local fallback. Error:', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.WRITE, `${COLLECTION_NAME}/${updatedRecord.id}`);
     }
   }
@@ -223,6 +256,7 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     await ensureAuthenticated();
     const q = query(collection(db, COLLECTION_NAME), orderBy('updatedAt', 'desc'));
     const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
@@ -231,7 +265,9 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     });
   } catch (error) {
     console.error('Firestore load failed. Reading local records only.', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.GET, COLLECTION_NAME);
     }
     return getLocalRecords();
@@ -283,9 +319,12 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     if (isNewerThanRemote) {
       try {
         await setDoc(doc(db, COLLECTION_NAME, record.id), record);
+        setQuotaExceeded(false); // Self-healing: clear quota flag on success
       } catch (e) {
         console.warn('Sync back to Firestore failed for', record.id, e);
-        if (e instanceof Error && (e.message.toLowerCase().includes('permission') || e.message.toLowerCase().includes('insufficient'))) {
+        if (isQuotaError(e)) {
+          setQuotaExceeded(true);
+        } else if (e instanceof Error && (e.message.toLowerCase().includes('permission') || e.message.toLowerCase().includes('insufficient'))) {
           // Log permission error but do not disrupt user sync flow
           console.error('Permission error syncing back record', record.id, e);
         }
@@ -309,9 +348,12 @@ export async function deleteStudentRecord(id: string): Promise<void> {
   try {
     await ensureAuthenticated();
     await deleteDoc(doc(db, COLLECTION_NAME, id));
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.error('Firestore delete failed:', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.DELETE, `${COLLECTION_NAME}/${id}`);
     }
   }
@@ -380,9 +422,12 @@ export async function saveExamManager(manager: ExamManager): Promise<void> {
     await ensureAuthenticated();
     const docRef = doc(db, EXAM_MANAGERS_COLLECTION, updatedManager.id);
     await setDoc(docRef, updatedManager);
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.warn('Firestore write failed for Exam Manager, using local fallback. Error:', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.WRITE, `${EXAM_MANAGERS_COLLECTION}/${updatedManager.id}`);
     }
   }
@@ -394,6 +439,7 @@ export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
     await ensureAuthenticated();
     const q = query(collection(db, EXAM_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
     const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
@@ -402,7 +448,9 @@ export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
     });
   } catch (error) {
     console.error('Firestore load failed for Exam Managers. Reading local records only.', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.GET, EXAM_MANAGERS_COLLECTION);
     }
     return getLocalExamManagers();
@@ -433,9 +481,12 @@ export async function deleteExamManager(id: string): Promise<void> {
   try {
     await ensureAuthenticated();
     await deleteDoc(doc(db, EXAM_MANAGERS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.error('Firestore delete failed for Exam Manager:', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.DELETE, `${EXAM_MANAGERS_COLLECTION}/${id}`);
     }
   }
@@ -462,9 +513,12 @@ export async function saveStudentExamInfo(record: StudentExamInfo): Promise<void
     await ensureAuthenticated();
     const docRef = doc(db, EXAM_RECORDS_COLLECTION, updatedRecord.id);
     await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.warn('Firestore write failed for Student Exam Info, using local fallback. Error:', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.WRITE, `${EXAM_RECORDS_COLLECTION}/${updatedRecord.id}`);
     }
   }
@@ -476,6 +530,7 @@ export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]>
     await ensureAuthenticated();
     const q = query(collection(db, EXAM_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
     const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
@@ -484,7 +539,9 @@ export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]>
     });
   } catch (error) {
     console.error('Firestore load failed for Student Exam Infos. Reading local records only.', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.GET, EXAM_RECORDS_COLLECTION);
     }
     return getLocalExamRecords();
@@ -515,9 +572,12 @@ export async function deleteStudentExamInfo(id: string): Promise<void> {
   try {
     await ensureAuthenticated();
     await deleteDoc(doc(db, EXAM_RECORDS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.error('Firestore delete failed for Student Exam Info:', error);
-    if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
+    if (isQuotaError(error)) {
+      setQuotaExceeded(true);
+    } else if (error instanceof Error && (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('insufficient'))) {
       handleFirestoreError(error, OperationType.DELETE, `${EXAM_RECORDS_COLLECTION}/${id}`);
     }
   }

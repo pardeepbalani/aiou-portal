@@ -9,9 +9,9 @@ import StudentDetails from './components/StudentDetails';
 import ExamRecordsModule from './components/ExamRecordsModule';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
-import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords } from './firebase';
+import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords, isQuotaExceeded } from './firebase';
 import { getSampleRecords } from './samples';
-import { RefreshCcw, Download, Smartphone, Share, X, PlusSquare } from 'lucide-react';
+import { RefreshCcw, Download, Smartphone, Share, X, PlusSquare, AlertCircle } from 'lucide-react';
 
 export default function App() {
   // Session & UI States
@@ -230,6 +230,25 @@ export default function App() {
         theme={theme}
         setTheme={setTheme}
       />
+
+      {/* Quota limit fallback notification */}
+      {isLoggedIn && isQuotaExceeded() && (
+        <div className="w-full max-w-7xl mx-auto px-6 pt-4">
+          <div className="p-4 bg-amber-50 border border-amber-250 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-3xs">
+            <div className="flex items-start md:items-center gap-3">
+              <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0">
+                <AlertCircle size={20} className="animate-pulse" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-amber-950">Firebase Cloud Quota Limit Reached (Running on Offline-Local Mode)</h4>
+                <p className="text-xs text-amber-850 mt-0.5 leading-relaxed">
+                  The cloud database is currently at its daily free limit. <strong>Don't worry! All student records, admissions, exam centers, and manager edits are saved 100% safely in your local storage.</strong> You can continue using the entire app normally. It will sync back to the cloud automatically once the daily limit resets.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cloud Synchronizer Indicators */}
       {isLoggedIn && (
