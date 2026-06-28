@@ -33,42 +33,38 @@
   ],
   "scope_extensions": [
     {
-      "origin": "https://aiou-portal-taupe.vercel.app"
+      "origin": "https://aiou-portal-taupe.vercel.app",
+      "has_origin_wildcard": true
     },
     {
-      "origin": "https://*.aiou-portal-taupe.vercel.app"
+      "origin": "https://vercel.app",
+      "has_origin_wildcard": true
     },
     {
-      "origin": "https://vercel.app"
+      "origin": "https://run.app",
+      "has_origin_wildcard": true
     },
     {
-      "origin": "https://*.vercel.app"
-    },
-    {
-      "origin": "https://*.run.app"
-    },
-    {
-      "origin": "https://*.asia-southeast1.run.app"
+      "origin": "https://asia-southeast1.run.app",
+      "has_origin_wildcard": true
     }
   ],
   "scopeExtensions": [
     {
-      "origin": "https://aiou-portal-taupe.vercel.app"
+      "origin": "https://aiou-portal-taupe.vercel.app",
+      "has_origin_wildcard": true
     },
     {
-      "origin": "https://*.aiou-portal-taupe.vercel.app"
+      "origin": "https://vercel.app",
+      "has_origin_wildcard": true
     },
     {
-      "origin": "https://vercel.app"
+      "origin": "https://run.app",
+      "has_origin_wildcard": true
     },
     {
-      "origin": "https://*.vercel.app"
-    },
-    {
-      "origin": "https://*.run.app"
-    },
-    {
-      "origin": "https://*.asia-southeast1.run.app"
+      "origin": "https://asia-southeast1.run.app",
+      "has_origin_wildcard": true
     }
   ],
   "launch_handler": {
