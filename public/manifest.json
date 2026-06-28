@@ -7,51 +7,68 @@
   "scope": "/",
   "display": "standalone",
   "display_override": [
+    "window-controls-overlay",
     "standalone",
     "minimal-ui",
     "browser"
   ],
   "background_color": "#ffffff",
   "theme_color": "#10b981",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "categories": [
     "education",
     "utilities"
   ],
   "lang": "en",
   "dir": "ltr",
+  "iarc_rating_id": "e933458b-967c-47fc-8f64-9fcb06368d14",
   "prefer_related_applications": false,
   "related_applications": [],
+  "launch_handler": {
+    "client_mode": [
+      "focus-existing",
+      "auto"
+    ]
+  },
+  "share_target": {
+    "action": "/?share=true",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "icons": [
     {
-      "src": "/app_icon_192.png",
+      "src": "app_icon_192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/app_icon_512.png",
+      "src": "app_icon_512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/app_icon_maskable.png",
+      "src": "app_icon_maskable.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "/screenshot_desktop.png",
+      "src": "screenshot_desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
       "label": "AIOU Portal Desktop Dashboard"
     },
     {
-      "src": "/screenshot_mobile.png",
+      "src": "screenshot_mobile.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",
@@ -62,12 +79,26 @@
     {
       "name": "Add Student Record",
       "url": "/?shortcut=admission",
-      "description": "Fast admission form for enrollment."
+      "description": "Fast admission form for enrollment.",
+      "icons": [
+        {
+          "src": "app_icon_192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "View Student Database",
       "url": "/?shortcut=database",
-      "description": "View all students profile database."
+      "description": "View all students profile database.",
+      "icons": [
+        {
+          "src": "app_icon_192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
