@@ -17,6 +17,9 @@ export interface CourseData {
 export interface SemesterData {
   semesterNumber: number; // 1-indexed
   courses: CourseData[]; // 6 courses per semester
+  semesterFee?: number;
+  semesterServiceCharges?: number;
+  semesterPaidAmount?: number;
 }
 
 export type StudentStatus = 'active' | 'completed' | 'suspended';
