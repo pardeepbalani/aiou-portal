@@ -126,7 +126,7 @@
       "purpose": "maskable"
     },
     {
-      "src": "/app_icon_maskable.png",
+      "src": "/app_icon_maskable_512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

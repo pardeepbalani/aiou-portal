@@ -132,6 +132,42 @@ async function generateAssets() {
   console.log('Saved app_icon_maskable.png');
 
 
+  // 3b. Generate 512x512 Maskable Icon
+  console.log('Generating app_icon_maskable_512.png (512x512 version)...');
+  const iconMaskable512 = new Jimp({ width: 512, height: 512, color: darkGreen });
+  
+  // Draw large circular seal (completely inside 80% safe zone radius 170px)
+  const centerX512 = 256;
+  const centerY512 = 256;
+  for (let x = 0; x < 512; x++) {
+    for (let y = 0; y < 512; y++) {
+      if (Math.hypot(x - centerX512, y - centerY512) <= 170) {
+        iconMaskable512.setPixelColor(emerald, x, y);
+      }
+    }
+  }
+
+  // Draw stylized letter "A" in the center (y=160 to y=352)
+  for (let y = 160; y <= 352; y++) {
+    const leftX = Math.round(256 - (y - 160) * (64 / 192));
+    const rightX = Math.round(256 + (y - 160) * (64 / 192));
+
+    for (let dx = -13; dx <= 13; dx++) {
+      iconMaskable512.setPixelColor(white, leftX + dx, y);
+      iconMaskable512.setPixelColor(white, rightX + dx, y);
+    }
+  }
+  // Draw the bar of 'A' at y=270
+  for (let x = 218; x <= 294; x++) {
+    for (let dy = -8; dy <= 8; dy++) {
+      iconMaskable512.setPixelColor(white, x, 270 + dy);
+    }
+  }
+
+  await iconMaskable512.write(path.join('public', 'app_icon_maskable_512.png') as any);
+  console.log('Saved app_icon_maskable_512.png');
+
+
   // 4. Generate Desktop Screenshot (1280x720)
   console.log('Generating screenshot_desktop.png (1280x720)...');
   const desktop = new Jimp({ width: 1280, height: 720, color: grayLight });
