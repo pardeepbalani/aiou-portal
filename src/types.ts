@@ -20,6 +20,14 @@ export interface SemesterData {
   semesterFee?: number;
   semesterServiceCharges?: number;
   semesterPaidAmount?: number;
+  paymentsList?: PaymentEntry[];
+  serviceEnrollment?: boolean;
+  serviceWorkshops?: boolean;
+  serviceQuiz?: boolean;
+  serviceAssignments?: boolean;
+  servicePhysicalWorkshop?: boolean;
+  serviceResearchReport?: boolean;
+  remarks?: string;
 }
 
 export type StudentStatus = 'active' | 'completed' | 'suspended';

@@ -20,7 +20,8 @@ import {
   Square,
   Sparkles,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Coins
 } from 'lucide-react';
 
 interface EnrollmentFormProps {
@@ -95,7 +96,35 @@ export default function EnrollmentForm({
       setCmsPasswordId(initialStudent.cmsPasswordId);
       setAdmissionYear(initialStudent.admissionYear);
       setSemesterType(initialStudent.semesterType);
-      setSemesters(JSON.parse(JSON.stringify(initialStudent.semesters))); // Deep copy
+      
+      const deepCopiedSemesters: SemesterData[] = JSON.parse(JSON.stringify(initialStudent.semesters));
+      
+      // Migrate legacy global payment data to first semester if semester-level payment history is empty
+      const hasAnySemesterPayments = deepCopiedSemesters.some(sem => sem.paymentsList && sem.paymentsList.length > 0);
+      if (!hasAnySemesterPayments && initialStudent.paymentsList && initialStudent.paymentsList.length > 0) {
+        if (deepCopiedSemesters[0]) {
+          deepCopiedSemesters[0].paymentsList = initialStudent.paymentsList;
+          deepCopiedSemesters[0].semesterPaidAmount = initialStudent.paymentsList.reduce((sum, p) => sum + p.amount, 0);
+        }
+      }
+      
+      // Migrate legacy global service charges and checkboxes to first semester if semester-level services are empty
+      const hasAnySemesterServices = deepCopiedSemesters.some(sem => 
+        sem.serviceEnrollment || sem.serviceWorkshops || sem.serviceQuiz || 
+        sem.serviceAssignments || sem.servicePhysicalWorkshop || sem.serviceResearchReport || sem.semesterServiceCharges
+      );
+      if (!hasAnySemesterServices && deepCopiedSemesters[0]) {
+        deepCopiedSemesters[0].semesterServiceCharges = initialStudent.serviceChargesAmount;
+        deepCopiedSemesters[0].serviceEnrollment = initialStudent.serviceEnrollment;
+        deepCopiedSemesters[0].serviceWorkshops = initialStudent.serviceWorkshops;
+        deepCopiedSemesters[0].serviceQuiz = initialStudent.serviceQuiz;
+        deepCopiedSemesters[0].serviceAssignments = initialStudent.serviceAssignments;
+        deepCopiedSemesters[0].servicePhysicalWorkshop = initialStudent.servicePhysicalWorkshop;
+        deepCopiedSemesters[0].serviceResearchReport = initialStudent.serviceResearchReport;
+        deepCopiedSemesters[0].remarks = initialStudent.remarks;
+      }
+
+      setSemesters(deepCopiedSemesters);
       setTotalReceivable(initialStudent.totalReceivable);
       setPaymentsList(initialStudent.paymentsList || []);
       setServiceChargesAmount(initialStudent.serviceChargesAmount || 0);
@@ -209,6 +238,19 @@ export default function EnrollmentForm({
 
     setSaving(true);
 
+    // Calculate global aggregates dynamically from the semesters array
+    const computedTotalReceivable = semesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0) || totalReceivable;
+    const computedPaymentsList = semesters.flatMap(sem => sem.paymentsList || []);
+    const computedServiceChargesAmount = semesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
+    const computedRemarks = semesters.map(sem => sem.remarks ? `Sem ${sem.semesterNumber}: ${sem.remarks}` : '').filter(Boolean).join(' | ') || remarks;
+    
+    const computedServiceEnrollment = semesters.some(sem => sem.serviceEnrollment);
+    const computedServiceWorkshops = semesters.some(sem => sem.serviceWorkshops);
+    const computedServiceQuiz = semesters.some(sem => sem.serviceQuiz);
+    const computedServiceAssignments = semesters.some(sem => sem.serviceAssignments);
+    const computedServicePhysicalWorkshop = semesters.some(sem => sem.servicePhysicalWorkshop);
+    const computedServiceResearchReport = semesters.some(sem => sem.serviceResearchReport);
+
     const finalRecord: StudentRecord = {
       id: initialStudent?.id || registrationId.trim(), // Use registration ID or auto ID as key
       studentName: studentName.trim(),
@@ -221,16 +263,16 @@ export default function EnrollmentForm({
       programSelected: programName,
       semesterType,
       semesters,
-      totalReceivable,
-      paymentsList,
-      serviceChargesAmount,
-      remarks: remarks.trim(),
-      serviceEnrollment,
-      serviceWorkshops,
-      serviceQuiz,
-      serviceAssignments,
-      servicePhysicalWorkshop,
-      serviceResearchReport,
+      totalReceivable: computedTotalReceivable,
+      paymentsList: computedPaymentsList.length > 0 ? computedPaymentsList : paymentsList,
+      serviceChargesAmount: computedServiceChargesAmount,
+      remarks: computedRemarks.trim(),
+      serviceEnrollment: computedServiceEnrollment,
+      serviceWorkshops: computedServiceWorkshops,
+      serviceQuiz: computedServiceQuiz,
+      serviceAssignments: computedServiceAssignments,
+      servicePhysicalWorkshop: computedServicePhysicalWorkshop,
+      serviceResearchReport: computedServiceResearchReport,
       status,
       createdAt: initialStudent?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -669,221 +711,251 @@ export default function EnrollmentForm({
                   </div>
                 </div>
               ))}
+
+              {/* E. Payment & Service Charges Section inside active semester */}
+              <div className="mt-8 pt-6 border-t border-gray-200 space-y-6">
+                <span className="text-sm font-bold text-gray-700 uppercase tracking-wider block mb-3 flex items-center gap-1.5">
+                  <Coins size={16} className="text-emerald-600" />
+                  <span>E. Payment & Service Charges for Semester {activeSemTab}</span>
+                </span>
+
+                <div className="grid md:grid-cols-2 gap-8">
+                  {/* Left Side: Payment Summary and history */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                      Payment Summary & Fees
+                    </h4>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          Semester Fee (Rs.)
+                        </label>
+                        <input
+                          type="number"
+                          value={semesters[activeSemTab - 1].semesterFee || ''}
+                          onChange={(e) => {
+                            const updated = [...semesters];
+                            updated[activeSemTab - 1].semesterFee = Number(e.target.value);
+                            setSemesters(updated);
+                          }}
+                          placeholder="e.g. 12000"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          Service Charges (Rs.)
+                        </label>
+                        <input
+                          type="number"
+                          value={semesters[activeSemTab - 1].semesterServiceCharges || ''}
+                          onChange={(e) => {
+                            const updated = [...semesters];
+                            updated[activeSemTab - 1].semesterServiceCharges = Number(e.target.value);
+                            setSemesters(updated);
+                          }}
+                          placeholder="e.g. 2500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Add Payment Received for this Semester */}
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                      <span className="text-[10px] font-bold text-gray-700 uppercase block">
+                        Record Semester {activeSemTab} Payment Received
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[9px] font-bold text-gray-500 mb-1">Amount (Rs)</label>
+                          <input
+                            type="number"
+                            value={newPaymentAmount}
+                            onChange={(e) => setNewPaymentAmount(e.target.value)}
+                            placeholder="e.g. 5000"
+                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-hidden"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-gray-500 mb-1">Date</label>
+                          <input
+                            type="date"
+                            value={newPaymentDate}
+                            onChange={(e) => setNewPaymentDate(e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-hidden"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const amt = parseFloat(newPaymentAmount);
+                          if (isNaN(amt) || amt <= 0) {
+                            alert('Please enter a valid payment amount.');
+                            return;
+                          }
+                          const newEntry: PaymentEntry = {
+                            id: Math.random().toString(36).substring(2, 9),
+                            date: newPaymentDate,
+                            amount: amt
+                          };
+                          const updated = [...semesters];
+                          const sem = updated[activeSemTab - 1];
+                          const pList = sem.paymentsList || [];
+                          sem.paymentsList = [...pList, newEntry];
+                          sem.semesterPaidAmount = sem.paymentsList.reduce((sum, p) => sum + p.amount, 0);
+                          setSemesters(updated);
+                          setNewPaymentAmount('');
+                        }}
+                        className={`w-full py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 text-white ${
+                          isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+                        }`}
+                      >
+                        <Plus size={14} />
+                        <span>Record Payment for Semester {activeSemTab}</span>
+                      </button>
+                    </div>
+
+                    {/* Payments History List for this Semester */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block">
+                        Semester {activeSemTab} Payments Ledger
+                      </span>
+                      {!(semesters[activeSemTab - 1].paymentsList && semesters[activeSemTab - 1].paymentsList!.length > 0) ? (
+                        <p className="text-xs text-gray-400 italic bg-gray-50 p-3 rounded-lg border border-dashed border-gray-200">
+                          No payment transactions recorded for this semester yet.
+                        </p>
+                      ) : (
+                        <div className="max-h-[140px] overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                          {semesters[activeSemTab - 1].paymentsList!.map((p) => (
+                            <div key={p.id} className="flex items-center justify-between p-2.5 bg-white text-xs hover:bg-gray-50">
+                              <div className="flex items-center gap-2">
+                                <Calendar size={13} className="text-gray-400" />
+                                <span className="font-mono text-gray-600">{p.date}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-bold text-emerald-700">Rs. {p.amount.toLocaleString()}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...semesters];
+                                    const sem = updated[activeSemTab - 1];
+                                    if (sem.paymentsList) {
+                                      sem.paymentsList = sem.paymentsList.filter(pay => pay.id !== p.id);
+                                      sem.semesterPaidAmount = sem.paymentsList.reduce((sum, pay) => sum + pay.amount, 0);
+                                      setSemesters(updated);
+                                    }
+                                  }}
+                                  className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Payment Summary Balances for this Semester */}
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col">
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase">Paid Amount</span>
+                        <span className="text-sm font-extrabold text-emerald-900 mt-1">
+                          Rs. {(semesters[activeSemTab - 1].semesterPaidAmount || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className={`p-3 rounded-xl border flex flex-col ${
+                        ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 
+                          ? 'bg-amber-50 border-amber-200' 
+                          : 'bg-green-50 border-green-200'
+                      }`}>
+                        <span className={`text-[10px] font-bold uppercase ${
+                          ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'text-amber-800' : 'text-green-800'
+                        }`}>
+                          {((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'Semester Balance' : 'Fully Paid'}
+                        </span>
+                        <span className={`text-sm font-extrabold mt-1 ${
+                          ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'text-amber-900' : 'text-green-900'
+                        }`}>
+                          Rs. {Math.max(0, ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0))).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Services required and Remarks */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                      Services Required & Semester Notes
+                    </h4>
+
+                    {/* Services List Toggles for this Semester */}
+                    <div className="bg-gray-50 p-4 border border-gray-200 rounded-xl space-y-3">
+                      <span className="text-[10px] font-bold text-gray-700 uppercase block mb-1">
+                        Services Required for Semester {activeSemTab}
+                      </span>
+
+                      <div className="space-y-2">
+                        {[
+                          { id: 'serviceEnrollment', label: 'Service Charges Against Enrollment' },
+                          { id: 'serviceWorkshops', label: 'Service Charges Against Workshops' },
+                          { id: 'serviceQuiz', label: 'Service Charges Against Quiz' },
+                          { id: 'serviceAssignments', label: 'Service Charges Against Assignments' },
+                          { id: 'servicePhysicalWorkshop', label: 'Service Charges Against Physical Workshop' },
+                          { id: 'serviceResearchReport', label: 'Service Charges Against Research Report' },
+                        ].map((service) => {
+                          const val = !!(semesters[activeSemTab - 1] as any)[service.id];
+                          return (
+                            <button
+                              key={service.id}
+                              type="button"
+                              onClick={() => {
+                                const updated = [...semesters];
+                                (updated[activeSemTab - 1] as any)[service.id] = !val;
+                                setSemesters(updated);
+                              }}
+                              className="w-full flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/5 text-left text-xs transition-all cursor-pointer"
+                            >
+                              <span className="font-medium text-gray-700">{service.label}</span>
+                              <div className={`p-0.5 rounded transition-colors ${
+                                val ? 'text-emerald-600' : 'text-gray-300'
+                              }`}>
+                                {val ? (
+                                  <CheckSquare size={18} className="fill-emerald-50 text-emerald-600" />
+                                ) : (
+                                  <Square size={18} />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Remarks Box for this Semester */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Semester {activeSemTab} Notes (Optional)
+                      </label>
+                      <textarea
+                        value={semesters[activeSemTab - 1].remarks || ''}
+                        onChange={(e) => {
+                          const updated = [...semesters];
+                          updated[activeSemTab - 1].remarks = e.target.value;
+                          setSemesters(updated);
+                        }}
+                        placeholder={`e.g., details on Semester ${activeSemTab} assignments, physical workshop locations...`}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
-        </div>
-
-        {/* SECTION E: Payment & Service Charges Section */}
-        <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs space-y-6">
-          <div className="flex items-center gap-2 mb-2 border-b border-gray-100 pb-3">
-            <DollarSign className={isGreen ? 'text-emerald-600' : 'text-sky-600'} size={20} />
-            <h3 className="text-lg font-bold text-gray-800">E. Payment & Service Charges Section</h3>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            
-            {/* Left side: Payment Summary and history */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-                Payment Summary
-              </h4>
-
-              {/* Total Receivable */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Total Payment Receivable (Rs.)
-                </label>
-                <div className="relative rounded-lg shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 font-bold text-xs">
-                    Rs
-                  </div>
-                  <input
-                    type="number"
-                    value={totalReceivable || ''}
-                    onChange={(e) => setTotalReceivable(Number(e.target.value))}
-                    placeholder="Enter Total Fees"
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              {/* Add Payment Received */}
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
-                <span className="text-xs font-bold text-gray-700 uppercase block">
-                  Add New Payment Received Entry
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">Amount (Rs)</label>
-                    <input
-                      type="number"
-                      value={newPaymentAmount}
-                      onChange={(e) => setNewPaymentAmount(e.target.value)}
-                      placeholder="e.g. 5000"
-                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-hidden"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={newPaymentDate}
-                      onChange={(e) => setNewPaymentDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-hidden"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddPayment}
-                  className={`w-full py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 text-white ${
-                    isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
-                  }`}
-                >
-                  <Plus size={14} />
-                  <span>Record Payment</span>
-                </button>
-              </div>
-
-              {/* Payments History List */}
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-gray-500 uppercase block">
-                  Payment History (Received over time)
-                </span>
-                {paymentsList.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic bg-gray-50 p-3 rounded-lg border border-dashed border-gray-200">
-                    No payment transactions recorded yet.
-                  </p>
-                ) : (
-                  <div className="max-h-[140px] overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                    {paymentsList.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between p-2.5 bg-white text-xs hover:bg-gray-50">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={13} className="text-gray-400" />
-                          <span className="font-mono text-gray-600">{p.date}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-emerald-700">Rs. {p.amount.toLocaleString()}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePayment(p.id)}
-                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Payment Summary Balances Cards */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase">Total Received</span>
-                  <span className="text-sm font-extrabold text-emerald-900 mt-1">
-                    Rs. {totalReceived.toLocaleString()}
-                  </span>
-                </div>
-                <div className={`p-3 rounded-xl border flex flex-col ${
-                  remainingReceivable > 0 
-                    ? 'bg-amber-50 border-amber-200' 
-                    : 'bg-green-50 border-green-200'
-                }`}>
-                  <span className={`text-[10px] font-bold uppercase ${
-                    remainingReceivable > 0 ? 'text-amber-800' : 'text-green-800'
-                  }`}>
-                    {remainingReceivable > 0 ? 'Remaining Receivable' : 'Fully Paid'}
-                  </span>
-                  <span className={`text-sm font-extrabold mt-1 ${
-                    remainingReceivable > 0 ? 'text-amber-900' : 'text-green-900'
-                  }`}>
-                    Rs. {remainingReceivable.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Right side: Extra & Service Required Section */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-                Services Required & Extra Costs
-              </h4>
-
-              {/* Service Charges (Amount) */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Service Charges (Amount) (Optional)
-                </label>
-                <div className="relative rounded-lg shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 font-bold text-xs">
-                    Rs
-                  </div>
-                  <input
-                    type="number"
-                    value={serviceChargesAmount || ''}
-                    onChange={(e) => setServiceChargesAmount(Number(e.target.value))}
-                    placeholder="Extra fees for handling services"
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              {/* Services List Toggles */}
-              <div className="bg-gray-50 p-4 border border-gray-200 rounded-xl space-y-3">
-                <span className="text-xs font-bold text-gray-700 uppercase block mb-1">
-                  Services Provided / Required
-                </span>
-
-                <div className="space-y-2">
-                  {[
-                    { id: 'enrollment', label: 'Service Charges Against Enrollment', val: serviceEnrollment, setVal: setServiceEnrollment },
-                    { id: 'workshops', label: 'Service Charges Against Workshops', val: serviceWorkshops, setVal: setServiceWorkshops },
-                    { id: 'quiz', label: 'Service Charges Against Quiz', val: serviceQuiz, setVal: setServiceQuiz },
-                    { id: 'assignments', label: 'Service Charges Against Assignments', val: serviceAssignments, setVal: setServiceAssignments },
-                    { id: 'physical', label: 'Service Charges Against Physical Workshop', val: servicePhysicalWorkshop, setVal: setServicePhysicalWorkshop },
-                    { id: 'research', label: 'Service Charges Against Research Report', val: serviceResearchReport, setVal: setServiceResearchReport },
-                  ].map((service) => (
-                    <button
-                      key={service.id}
-                      type="button"
-                      onClick={() => service.setVal(!service.val)}
-                      className="w-full flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/5 text-left text-xs transition-all cursor-pointer"
-                    >
-                      <span className="font-medium text-gray-700">{service.label}</span>
-                      <div className={`p-0.5 rounded transition-colors ${
-                        service.val ? 'text-emerald-600' : 'text-gray-300'
-                      }`}>
-                        {service.val ? (
-                          <CheckSquare size={18} className="fill-emerald-50 text-emerald-600" />
-                        ) : (
-                          <Square size={18} />
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Remarks Box */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Remarks / Special Notes (Optional)
-                </label>
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g., student requested installments, details on assignments, physical workshop locations..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
-
-            </div>
-
-          </div>
         </div>
 
         {/* BOTTOM ACTION BAR */}

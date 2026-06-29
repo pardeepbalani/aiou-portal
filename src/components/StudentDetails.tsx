@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StudentRecord, CourseData, SemesterData } from '../types';
+import { StudentRecord, CourseData, SemesterData, PaymentEntry } from '../types';
 import { 
   Printer, 
   FileSpreadsheet, 
@@ -24,7 +24,11 @@ import {
   Building,
   MessageSquare,
   Send,
-  Copy
+  Copy,
+  Coins,
+  Trash2,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 
 interface StudentDetailsProps {
@@ -47,6 +51,205 @@ export default function StudentDetails({
   // Toggle state to switch between regular view, PDF/transcript Mode, and Challan Mode
   const [pdfModeActive, setPdfModeActive] = useState(false);
   const [challanModeActive, setChallanModeActive] = useState(false);
+
+  // Semester Finance inline editing states
+  const [editingSemFinance, setEditingSemFinance] = useState<number | null>(null);
+  const [semFeeInput, setSemFeeInput] = useState('0');
+  const [semChargesInput, setSemChargesInput] = useState('0');
+  const [semPaidInput, setSemPaidInput] = useState('0');
+
+  // Per-semester payment collection and action states
+  const [activePaymentSemNum, setActivePaymentSemNum] = useState<number | null>(null);
+  const [newPaymentAmount, setNewPaymentAmount] = useState('');
+  const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newPaymentRef, setNewPaymentRef] = useState('');
+
+  const handleSaveSemesterFinance = async (
+    semNum: number,
+    fee: number,
+    charges: number,
+    paid: number
+  ) => {
+    if (!onUpdateStudent) return;
+
+    const updatedSemesters = student.semesters.map(sem => {
+      if (sem.semesterNumber === semNum) {
+        return {
+          ...sem,
+          semesterFee: fee,
+          semesterServiceCharges: charges,
+          semesterPaidAmount: paid
+        };
+      }
+      return sem;
+    });
+
+    const updatedStudent: StudentRecord = {
+      ...student,
+      semesters: updatedSemesters,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Recalculate global aggregates
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
+    const computedPayments = updatedSemesters.flatMap(sem => sem.paymentsList || []);
+    if (computedPayments.length > 0) {
+      updatedStudent.paymentsList = computedPayments;
+    }
+
+    try {
+      await onUpdateStudent(updatedStudent);
+      setEditingSemFinance(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Record a payment at the semester level
+  const handleAddSemesterPayment = async (
+    semNum: number,
+    amount: number,
+    date: string,
+    ref: string
+  ) => {
+    if (!onUpdateStudent) return;
+
+    const updatedSemesters = student.semesters.map(sem => {
+      if (sem.semesterNumber === semNum) {
+        const newPayment: PaymentEntry = {
+          id: 'pay-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
+          amount,
+          date,
+          voucherRef: ref.trim()
+        };
+        const currentList = sem.paymentsList || [];
+        const updatedList = [...currentList, newPayment];
+        return {
+          ...sem,
+          paymentsList: updatedList,
+          semesterPaidAmount: updatedList.reduce((sum, p) => sum + p.amount, 0)
+        };
+      }
+      return sem;
+    });
+
+    const updatedStudent: StudentRecord = {
+      ...student,
+      semesters: updatedSemesters,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Recalculate global aggregates
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.paymentsList = updatedSemesters.flatMap(sem => sem.paymentsList || []);
+
+    try {
+      await onUpdateStudent(updatedStudent);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Delete a payment at the semester level
+  const handleDeleteSemesterPayment = async (semNum: number, paymentId: string) => {
+    if (!onUpdateStudent) return;
+
+    const updatedSemesters = student.semesters.map(sem => {
+      if (sem.semesterNumber === semNum) {
+        const currentList = sem.paymentsList || [];
+        const updatedList = currentList.filter(p => p.id !== paymentId);
+        return {
+          ...sem,
+          paymentsList: updatedList,
+          semesterPaidAmount: updatedList.reduce((sum, p) => sum + p.amount, 0)
+        };
+      }
+      return sem;
+    });
+
+    const updatedStudent: StudentRecord = {
+      ...student,
+      semesters: updatedSemesters,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Recalculate global aggregates
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.paymentsList = updatedSemesters.flatMap(sem => sem.paymentsList || []);
+
+    try {
+      await onUpdateStudent(updatedStudent);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Toggle service checkbox for specific semester in details view
+  const handleToggleSemesterService = async (semNum: number, field: keyof SemesterData) => {
+    if (!onUpdateStudent) return;
+
+    const updatedSemesters = student.semesters.map(sem => {
+      if (sem.semesterNumber === semNum) {
+        return {
+          ...sem,
+          [field]: !sem[field as keyof SemesterData]
+        };
+      }
+      return sem;
+    });
+
+    const updatedStudent: StudentRecord = {
+      ...student,
+      semesters: updatedSemesters,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Recalculate global aggregates
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.serviceEnrollment = updatedSemesters.some(sem => sem.serviceEnrollment);
+    updatedStudent.serviceWorkshops = updatedSemesters.some(sem => sem.serviceWorkshops);
+    updatedStudent.serviceQuiz = updatedSemesters.some(sem => sem.serviceQuiz);
+    updatedStudent.serviceAssignments = updatedSemesters.some(sem => sem.serviceAssignments);
+    updatedStudent.servicePhysicalWorkshop = updatedSemesters.some(sem => sem.servicePhysicalWorkshop);
+    updatedStudent.serviceResearchReport = updatedSemesters.some(sem => sem.serviceResearchReport);
+
+    try {
+      await onUpdateStudent(updatedStudent);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Update notes/remarks for a specific semester in details view
+  const handleSaveSemesterRemarks = async (semNum: number, notes: string) => {
+    if (!onUpdateStudent) return;
+
+    const updatedSemesters = student.semesters.map(sem => {
+      if (sem.semesterNumber === semNum) {
+        return {
+          ...sem,
+          remarks: notes
+        };
+      }
+      return sem;
+    });
+
+    const updatedStudent: StudentRecord = {
+      ...student,
+      semesters: updatedSemesters,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await onUpdateStudent(updatedStudent);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // New Payment Form states
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -708,268 +911,345 @@ export default function StudentDetails({
                       ))}
                     </div>
                   )}
+
+                  {/* Semester Financial Section */}
+                  <div className="mt-4 pt-3 border-t border-gray-200 text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-gray-700 flex items-center gap-1.5">
+                        <Coins size={14} className="text-emerald-600" />
+                        <span>Semester Financials</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSemFinance(editingSemFinance === sem.semesterNumber ? null : sem.semesterNumber);
+                          setSemFeeInput(sem.semesterFee?.toString() || '0');
+                          setSemChargesInput(sem.semesterServiceCharges?.toString() || '0');
+                          setSemPaidInput(sem.semesterPaidAmount?.toString() || '0');
+                        }}
+                        className="interactive-actions text-[10px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 size={11} />
+                        <span>{editingSemFinance === sem.semesterNumber ? 'Cancel' : 'Update'}</span>
+                      </button>
+                    </div>
+
+                    {editingSemFinance === sem.semesterNumber ? (
+                      <div className="interactive-actions bg-white p-3 rounded-lg border border-gray-200 space-y-3">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Semester Fee (Rs.)</label>
+                            <input
+                              type="number"
+                              value={semFeeInput}
+                              onChange={(e) => setSemFeeInput(e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Service Charges (Rs.)</label>
+                            <input
+                              type="number"
+                              value={semChargesInput}
+                              onChange={(e) => setSemChargesInput(e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Paid Amount (Rs.)</label>
+                            <input
+                              type="number"
+                              value={semPaidInput}
+                              onChange={(e) => setSemPaidInput(e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const fee = parseFloat(semFeeInput) || 0;
+                              const charges = parseFloat(semChargesInput) || 0;
+                              const paid = parseFloat(semPaidInput) || 0;
+                              handleSaveSemesterFinance(sem.semesterNumber, fee, charges, paid);
+                            }}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Check size={12} />
+                            <span>Save Financials</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-3xs">
+                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Fee</span>
+                          <span className="font-extrabold text-gray-900 font-mono">Rs. {(sem.semesterFee || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-3xs">
+                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Service Charges</span>
+                          <span className="font-extrabold text-gray-700 font-mono">Rs. {(sem.semesterServiceCharges || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-3xs">
+                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Paid</span>
+                          <span className="font-extrabold text-emerald-700 font-mono">Rs. {(sem.semesterPaidAmount || 0).toLocaleString()}</span>
+                        </div>
+                        <div className={`p-2 rounded-lg border shadow-3xs ${
+                          ((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0) - (sem.semesterPaidAmount || 0)) > 0
+                            ? 'bg-amber-50/50 border-amber-200 text-amber-800'
+                            : 'bg-green-50/50 border-green-200 text-green-800'
+                        }`}>
+                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Balance</span>
+                          <span className="font-extrabold font-mono">
+                            Rs. {((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0) - (sem.semesterPaidAmount || 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Semester Services Required & Remarks checklist */}
+                  <div className="mt-4 pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    {/* Services Required */}
+                    <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-xs space-y-2">
+                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide block mb-1">
+                        Services Required for Semester {sem.semesterNumber}
+                      </span>
+                      <div className="space-y-1.5">
+                        {[
+                          { id: 'serviceEnrollment', label: 'Enrollment Support' },
+                          { id: 'serviceWorkshops', label: 'Workshops Handling' },
+                          { id: 'serviceQuiz', label: 'Online Quizzes' },
+                          { id: 'serviceAssignments', label: 'Assignments Submission' },
+                          { id: 'servicePhysicalWorkshop', label: 'Physical Workshop' },
+                          { id: 'serviceResearchReport', label: 'Research Report Assistance' },
+                        ].map((service) => {
+                          const val = !!(sem as any)[service.id];
+                          return (
+                            <button
+                              key={service.id}
+                              type="button"
+                              onClick={() => handleToggleSemesterService(sem.semesterNumber, service.id as any)}
+                              className="w-full flex items-center justify-between p-2 rounded-lg border border-gray-150 hover:bg-emerald-50/5 text-left text-[11px] transition-all cursor-pointer"
+                            >
+                              <span className={val ? 'text-gray-800 font-semibold' : 'text-gray-400'}>{service.label}</span>
+                              <div className={val ? 'text-emerald-600' : 'text-gray-300'}>
+                                {val ? <CheckSquare size={15} /> : <Square size={15} />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Semester Remarks / Notes */}
+                    <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-xs flex flex-col justify-between space-y-2">
+                      <div>
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide block mb-1">
+                          Semester {sem.semesterNumber} Notes / Remarks
+                        </span>
+                        <textarea
+                          defaultValue={sem.remarks || ''}
+                          onBlur={(e) => handleSaveSemesterRemarks(sem.semesterNumber, e.target.value)}
+                          placeholder="Type details about this semester and click away to save..."
+                          rows={4}
+                          className="w-full p-2 border border-gray-200 rounded-lg text-xs bg-gray-50/30 focus:bg-white transition-colors"
+                        />
+                      </div>
+                      <span className="text-[9px] text-gray-400 text-right italic font-semibold">
+                        *Auto-saves when you click away / tap out
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Semester-specific Payments Ledger */}
+                  <div className="mt-4 pt-3 border-t border-gray-100 text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide">
+                        Semester {sem.semesterNumber} Payments History
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActivePaymentSemNum(activePaymentSemNum === sem.semesterNumber ? null : sem.semesterNumber)}
+                        className="interactive-actions text-[10px] font-extrabold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={12} />
+                        <span>{activePaymentSemNum === sem.semesterNumber ? 'Close' : 'Record Payment'}</span>
+                      </button>
+                    </div>
+
+                    {/* Add semester-specific payment form */}
+                    {activePaymentSemNum === sem.semesterNumber && (
+                      <div className="bg-gray-50 p-3 rounded-lg border border-dashed border-gray-300 space-y-2 mb-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Amount (Rs.)</label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 5000"
+                              value={newPaymentAmount}
+                              onChange={(e) => setNewPaymentAmount(e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md bg-white font-mono text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Date</label>
+                            <input
+                              type="date"
+                              value={newPaymentDate}
+                              onChange={(e) => setNewPaymentDate(e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md bg-white font-mono text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Ref (Voucher ID, etc)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. CH-1031"
+                            value={newPaymentRef}
+                            onChange={(e) => setNewPaymentRef(e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md bg-white font-mono text-xs"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const amt = parseFloat(newPaymentAmount);
+                            if (isNaN(amt) || amt <= 0) {
+                              alert('Please enter a valid amount.');
+                              return;
+                            }
+                            handleAddSemesterPayment(sem.semesterNumber, amt, newPaymentDate, newPaymentRef);
+                            setNewPaymentAmount('');
+                            setNewPaymentRef('');
+                            setActivePaymentSemNum(null);
+                          }}
+                          className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-md text-[11px] flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Check size={12} />
+                          <span>Save Payment to Semester {sem.semesterNumber}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Payments Ledger List for this Semester */}
+                    {sem.paymentsList && sem.paymentsList.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto mt-2">
+                        {sem.paymentsList.map((p, pIdx) => (
+                          <div key={p.id || pIdx} className="bg-white p-2 rounded-lg border border-gray-200 flex justify-between items-center text-xs">
+                            <div>
+                              <span className="font-extrabold text-gray-800">Rs. {p.amount.toLocaleString()}</span>
+                              <span className="block text-[9px] text-gray-400 font-mono">Date: {p.date} {p.voucherRef ? `| Ref: ${p.voucherRef}` : ''}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSemesterPayment(sem.semesterNumber, p.id)}
+                              className="text-red-500 hover:text-red-700 p-1 cursor-pointer transition-colors"
+                              title="Delete payment entry"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic bg-white p-2.5 rounded-lg border border-gray-150 text-center">
+                        No payments recorded for this semester yet.
+                      </p>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          {/* 4. Financial Status & Payment logs + Services required (Grid) */}
-          <div className="grid md:grid-cols-2 gap-8 mb-4">
-            
-            {/* Col A: Financial transactions & Collection Ledger */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 border-b pb-1">
-                Financial Ledger Summary
-              </h4>
-
-              <div className="space-y-3.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Total Receivable Fees:</span>
-                  <span className="font-bold text-gray-900">Rs. {student.totalReceivable?.toLocaleString() || 0}</span>
-                </div>
-                
-                {/* Payment transactions ledger list */}
-                <div className="space-y-1 bg-gray-50 p-3.5 rounded-xl border border-gray-200 shadow-3xs">
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide block mb-1.5">
-                    Payments History Ledger
-                  </span>
-                  
-                  {student.paymentsList && student.paymentsList.length > 0 ? (
-                    <div className="space-y-1 text-xs max-h-40 overflow-y-auto pr-1">
-                      {student.paymentsList.map((p, pIdx) => (
-                        <div key={p.id || pIdx} className="flex justify-between items-center text-gray-600 py-1 border-b border-gray-150 border-dashed last:border-b-0">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-gray-800">● Rs. {p.amount.toLocaleString()}</span>
-                            <span className="text-[9px] text-gray-400 font-mono">Date: {p.date} {p.voucherRef ? `| Ref: ${p.voucherRef}` : ''}</span>
-                          </div>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">Realized</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-gray-400 italic block py-2">No payments recorded yet.</span>
-                  )}
-                </div>
-
-                {/* COLLECT PAYMENT DYNAMIC FORM (INTERACTIVE ACTIONS ONLY) */}
-                <div className="interactive-actions ledger-form-section bg-gray-50/50 p-4 rounded-xl border border-dashed border-gray-300 space-y-3">
-                  <div className="flex items-center justify-between border-b border-dashed pb-1.5">
-                    <span className="text-xs font-extrabold text-gray-700 flex items-center gap-1">
-                      <Plus size={14} className="text-emerald-600" />
-                      <span>Collect New Payment</span>
-                    </span>
-                    <span className={`text-[10px] font-extrabold ${balance > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                      Due: Rs. {balance.toLocaleString()}
-                    </span>
-                  </div>
-
-                  <form onSubmit={handleAddPaymentSubmit} className="space-y-2 text-xs">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-500 font-bold uppercase mb-0.5">Amount (Rs.)</label>
-                        <input
-                          type="number"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          placeholder="e.g. 5000"
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-500 font-bold uppercase mb-0.5">Payment Date</label>
-                        <input
-                          type="date"
-                          value={paymentDate}
-                          onChange={(e) => setPaymentDate(e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] text-gray-500 font-bold uppercase mb-0.5">Voucher / Challan ID / Bank Ref ID</label>
-                      <input
-                        type="text"
-                        value={paymentRef}
-                        onChange={(e) => setPaymentRef(e.target.value)}
-                        placeholder="e.g. CH-201842-NBP"
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white"
-                      />
-                    </div>
-
-                    {paymentError && (
-                      <p className="text-[10px] font-semibold text-rose-600 flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        <span>{paymentError}</span>
-                      </p>
-                    )}
-
-                    {paymentSuccess && (
-                      <p className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1 animate-bounce">
-                        <CheckCircle size={12} />
-                        <span>Payment recorded and synced successfully!</span>
-                      </p>
-                    )}
-
-                    <button
-                      type="submit"
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
-                    >
-                      <Check size={14} />
-                      <span>Post Fee Transaction</span>
-                    </button>
-                  </form>
-                </div>
-
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-gray-400 font-medium">Total Received Amount:</span>
-                  <span className="font-extrabold text-emerald-700">Rs. {totalPaid.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 font-medium">Remaining Outstanding Balance:</span>
-                  <span className={`font-extrabold text-md ${balance > 0 ? 'text-amber-700' : 'text-green-700'}`}>
-                    Rs. {balance.toLocaleString()}
-                  </span>
-                </div>
-                {student.serviceChargesAmount !== undefined && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Service Charges (Extra):</span>
-                    <span className="font-semibold text-gray-800">Rs. {student.serviceChargesAmount.toLocaleString()}</span>
-                  </div>
-                )}
+          {/* 4. Smart Communication & Alerts Hub */}
+          <div className="mb-4">
+            <div className="interactive-actions bg-white p-5 rounded-xl border border-gray-200 shadow-2xs space-y-3.5 max-w-2xl mx-auto">
+              <div className="flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                <MessageSquare size={16} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
+                <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                  Smart Reminders & Alerts Hub
+                </span>
               </div>
-            </div>
 
-            {/* Col B: Services Required & Remarks */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 border-b pb-1">
-                Services Required & Administrative Notes
-              </h4>
-
-              {/* Services required checklist visualizer */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {/* Select Template tab list */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px] font-bold">
                 {[
-                  { label: 'Enrollment Support', active: student.serviceEnrollment },
-                  { label: 'Workshops Handling', active: student.serviceWorkshops },
-                  { label: 'Online Quizzes', active: student.serviceQuiz },
-                  { label: 'Assignments Submission', active: student.serviceAssignments },
-                  { label: 'Physical Workshop', active: student.servicePhysicalWorkshop },
-                  { label: 'Research Report Assistance', active: student.serviceResearchReport },
-                ].map((service, index) => (
-                  <div 
-                    key={index}
-                    className={`p-2 rounded-lg border flex items-center gap-2 ${
-                      service.active
-                        ? 'bg-emerald-50/50 border-emerald-200 text-emerald-900 font-semibold'
-                        : 'bg-gray-50/50 border-gray-150 text-gray-400'
+                  { id: 'fee' as const, label: 'Fee Outstanding' },
+                  { id: 'deadline' as const, label: 'LMS Deadlines' },
+                  { id: 'workshop' as const, label: 'Workshops Alert' },
+                  { id: 'welcome' as const, label: 'CMS Credentials' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedTemplate(tab.id)}
+                    className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                      selectedTemplate === tab.id
+                        ? isGreen 
+                          ? 'bg-emerald-600 text-white border-emerald-700'
+                          : 'bg-sky-600 text-white border-sky-700'
+                        : 'bg-gray-50 text-gray-500 border-gray-150 hover:bg-gray-100'
                     }`}
                   >
-                    {service.active ? (
-                      <CheckCircle size={14} className="text-emerald-600 shrink-0" />
-                    ) : (
-                      <XCircle size={14} className="text-gray-300 shrink-0" />
-                    )}
-                    <span className="truncate">{service.label}</span>
-                  </div>
+                    {tab.label}
+                  </button>
                 ))}
               </div>
 
-              {/* Remarks visual card */}
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide block mb-1">
-                  Administrative Remarks
-                </span>
-                <p className="text-gray-700 leading-relaxed italic">
-                  {student.remarks || 'No remarks recorded for this student.'}
-                </p>
+              {/* Preview text-area */}
+              <div className="space-y-1">
+                <label className="block text-[9px] font-bold uppercase tracking-wider text-gray-400">
+                  Template Draft Preview
+                </label>
+                <textarea
+                  readOnly
+                  value={getTemplateText()}
+                  className="w-full h-36 p-2 bg-gray-50 text-[11px] text-gray-700 font-sans border border-gray-200 rounded-lg leading-relaxed focus:outline-hidden resize-none select-all"
+                />
               </div>
 
-              {/* SMART COMMUNICATION & REMINDER TOOL (INTERACTIVE ACTIONS ONLY - HIDDEN IN PRINT) */}
-              <div className="interactive-actions bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-3.5">
-                <div className="flex items-center gap-1.5 border-b border-gray-100 pb-2">
-                  <MessageSquare size={16} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
-                  <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
-                    Smart Reminders & Alerts Hub
-                  </span>
-                </div>
+              {/* Call to actions */}
+              <div className="flex gap-2">
+                {/* Copy Button */}
+                <button
+                  onClick={handleCopyToClipboard}
+                  className="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 border border-gray-300 cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={14} className="text-green-600" />
+                      <span className="text-green-700">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={13} />
+                      <span>Copy Message</span>
+                    </>
+                  )}
+                </button>
 
-                {/* Select Template tab list */}
-                <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold">
-                  {[
-                    { id: 'fee' as const, label: 'Fee Outstanding' },
-                    { id: 'deadline' as const, label: 'LMS Deadlines' },
-                    { id: 'workshop' as const, label: 'Workshops Alert' },
-                    { id: 'welcome' as const, label: 'CMS Credentials' },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setSelectedTemplate(tab.id)}
-                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                        selectedTemplate === tab.id
-                          ? isGreen 
-                            ? 'bg-emerald-600 text-white border-emerald-700'
-                            : 'bg-sky-600 text-white border-sky-700'
-                          : 'bg-gray-50 text-gray-500 border-gray-150 hover:bg-gray-100'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Preview text-area */}
-                <div className="space-y-1">
-                  <label className="block text-[9px] font-bold uppercase tracking-wider text-gray-400">
-                    Template Draft Preview
-                  </label>
-                  <textarea
-                    readOnly
-                    value={getTemplateText()}
-                    className="w-full h-36 p-2 bg-gray-50 text-[11px] text-gray-700 font-sans border border-gray-200 rounded-lg leading-relaxed focus:outline-hidden resize-none select-all"
-                  />
-                </div>
-
-                {/* Call to actions */}
-                <div className="flex gap-2">
-                  {/* Copy Button */}
-                  <button
-                    onClick={handleCopyToClipboard}
-                    className="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 border border-gray-300 cursor-pointer"
-                  >
-                    {copied ? (
-                      <>
-                        <Check size={14} className="text-green-600" />
-                        <span className="text-green-700">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} />
-                        <span>Copy Message</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Send WhatsApp */}
-                  <a
-                    href={`https://api.whatsapp.com/send?phone=${(student.phoneNumber || '').replace(/\D/g, '').startsWith('03') ? '92' + (student.phoneNumber || '').replace(/\D/g, '').substring(1) : (student.phoneNumber || '').replace(/\D/g, '')}&text=${encodeURIComponent(getTemplateText())}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex-1 py-1.5 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 text-white shadow-3xs cursor-pointer ${
-                      isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
-                    }`}
-                  >
-                    <Send size={13} />
-                    <span>Send on WhatsApp</span>
-                  </a>
-                </div>
-                
-                <p className="text-[9px] text-gray-400 font-medium italic text-center">
-                  *WhatsApp button pre-fills the message directly to the student's mobile number: {student.phoneNumber || 'N/A'}.
-                </p>
+                {/* Send WhatsApp */}
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${(student.phoneNumber || '').replace(/\D/g, '').startsWith('03') ? '92' + (student.phoneNumber || '').replace(/\D/g, '').substring(1) : (student.phoneNumber || '').replace(/\D/g, '')}&text=${encodeURIComponent(getTemplateText())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex-1 py-1.5 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 text-white shadow-3xs cursor-pointer ${
+                    isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+                  }`}
+                >
+                  <Send size={13} />
+                  <span>Send on WhatsApp</span>
+                </a>
               </div>
+              
+              <p className="text-[9px] text-gray-400 font-medium italic text-center">
+                *WhatsApp button pre-fills the message directly to the student's mobile number: {student.phoneNumber || 'N/A'}.
+              </p>
             </div>
-
           </div>
 
           {/* Official Signatures footer for PDF transcripts */}
