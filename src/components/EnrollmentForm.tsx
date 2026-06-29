@@ -241,7 +241,7 @@ export default function EnrollmentForm({
     setSaving(true);
 
     // Calculate global aggregates dynamically from the semesters array
-    const computedTotalReceivable = semesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0) || totalReceivable;
+    const computedTotalReceivable = semesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0) || totalReceivable;
     const computedPaymentsList = semesters.flatMap(sem => sem.paymentsList || []);
     const computedServiceChargesAmount = semesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     const computedRemarks = semesters.map(sem => sem.remarks ? `Sem ${sem.semesterNumber}: ${sem.remarks}` : '').filter(Boolean).join(' | ') || remarks;
@@ -728,26 +728,10 @@ export default function EnrollmentForm({
                       Payment Summary & Fees
                     </h4>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          Semester Fee (Rs.)
-                        </label>
-                        <input
-                          type="number"
-                          value={semesters[activeSemTab - 1].semesterFee || ''}
-                          onChange={(e) => {
-                            const updated = [...semesters];
-                            updated[activeSemTab - 1].semesterFee = Number(e.target.value);
-                            setSemesters(updated);
-                          }}
-                          placeholder="e.g. 12000"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          Service Charges (Rs.)
+                          Total Receivable Service Charges (Rs.)
                         </label>
                         <input
                           type="number"
@@ -755,10 +739,11 @@ export default function EnrollmentForm({
                           onChange={(e) => {
                             const updated = [...semesters];
                             updated[activeSemTab - 1].semesterServiceCharges = Number(e.target.value);
+                            updated[activeSemTab - 1].semesterFee = 0; // set fee to 0 as requested
                             setSemesters(updated);
                           }}
                           placeholder="e.g. 2500"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white font-mono"
                         />
                       </div>
                     </div>
@@ -866,12 +851,12 @@ export default function EnrollmentForm({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                       {/* Total Receivable */}
                       <div className="p-3 bg-white rounded-xl border border-gray-200 flex flex-col shadow-3xs">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Total Receivable</span>
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Receivable Service Charges</span>
                         <span className="text-sm font-extrabold text-gray-900 mt-1">
-                          Rs. {((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0)).toLocaleString()}
+                          Rs. {(semesters[activeSemTab - 1].semesterServiceCharges || 0).toLocaleString()}
                         </span>
                         <span className="text-[9px] text-gray-400 mt-1 block">
-                          Fee: Rs. {(semesters[activeSemTab - 1].semesterFee || 0).toLocaleString()} | Service: Rs. {(semesters[activeSemTab - 1].semesterServiceCharges || 0).toLocaleString()}
+                          Total charges for semester
                         </span>
                       </div>
                       
@@ -888,15 +873,15 @@ export default function EnrollmentForm({
 
                       {/* Remaining Balance */}
                       <div className={`p-3 rounded-xl border flex flex-col shadow-3xs ${
-                        ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 
+                        ((semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 
                           ? 'bg-amber-50 border-amber-200 text-amber-900' 
                           : 'bg-green-50 border-green-200 text-green-900'
                       }`}>
                         <span className="text-[10px] font-bold uppercase tracking-wide">
-                          {((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'Remaining Due' : 'Fully Paid'}
+                          {((semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'Remaining Balance' : 'Fully Paid'}
                         </span>
                         <span className="text-sm font-extrabold mt-1">
-                          Rs. {Math.max(0, ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0))).toLocaleString()}
+                          Rs. {Math.max(0, ((semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0))).toLocaleString()}
                         </span>
                         <span className="text-[9px] text-gray-400 mt-1 block">
                           Pending semester balance

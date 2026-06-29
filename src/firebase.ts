@@ -130,6 +130,17 @@ export function sanitizeStudentRecord(r: any): StudentRecord {
     return Array.isArray(semesters) ? semesters.map(sem => ({
       semesterNumber: Number(sem?.semesterNumber) || 1,
       courses: sanitizeCourses(sem?.courses),
+      semesterFee: typeof sem?.semesterFee === 'number' ? sem.semesterFee : Number(sem?.semesterFee) || 0,
+      semesterServiceCharges: typeof sem?.semesterServiceCharges === 'number' ? sem.semesterServiceCharges : Number(sem?.semesterServiceCharges) || 0,
+      semesterPaidAmount: typeof sem?.semesterPaidAmount === 'number' ? sem.semesterPaidAmount : Number(sem?.semesterPaidAmount) || 0,
+      paymentsList: sanitizePayments(sem?.paymentsList),
+      serviceEnrollment: Boolean(sem?.serviceEnrollment),
+      serviceWorkshops: Boolean(sem?.serviceWorkshops),
+      serviceQuiz: Boolean(sem?.serviceQuiz),
+      serviceAssignments: Boolean(sem?.serviceAssignments),
+      servicePhysicalWorkshop: Boolean(sem?.servicePhysicalWorkshop),
+      serviceResearchReport: Boolean(sem?.serviceResearchReport),
+      remarks: typeof sem?.remarks === 'string' ? sem.remarks : '',
     })) : [];
   };
 

@@ -91,7 +91,7 @@ export default function StudentDetails({
     };
 
     // Recalculate global aggregates
-    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     const computedPayments = updatedSemesters.flatMap(sem => sem.paymentsList || []);
     if (computedPayments.length > 0) {
@@ -141,7 +141,7 @@ export default function StudentDetails({
     };
 
     // Recalculate global aggregates
-    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.paymentsList = updatedSemesters.flatMap(sem => sem.paymentsList || []);
 
@@ -176,7 +176,7 @@ export default function StudentDetails({
     };
 
     // Recalculate global aggregates
-    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.paymentsList = updatedSemesters.flatMap(sem => sem.paymentsList || []);
 
@@ -208,7 +208,7 @@ export default function StudentDetails({
     };
 
     // Recalculate global aggregates
-    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterFee || 0) + (sem.semesterServiceCharges || 0), 0);
+    updatedStudent.totalReceivable = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.serviceChargesAmount = updatedSemesters.reduce((sum, sem) => sum + (sem.semesterServiceCharges || 0), 0);
     updatedStudent.serviceEnrollment = updatedSemesters.some(sem => sem.serviceEnrollment);
     updatedStudent.serviceWorkshops = updatedSemesters.some(sem => sem.serviceWorkshops);
@@ -276,7 +276,7 @@ export default function StudentDetails({
 
     switch (selectedTemplate) {
       case 'fee':
-        return `Dear ${student.studentName},\n\nThis is a friendly reminder from AIOU Support regarding your outstanding dues for the ${student.programSelected} program.\n\n*Fee Breakdown*:\n- Total Receivable: Rs. ${student.totalReceivable?.toLocaleString()}\n- Total Paid: Rs. ${totalPaid.toLocaleString()}\n- *Outstanding Balance: Rs. ${balance.toLocaleString()}*\n\nPlease deposit your outstanding fee using Challan No: AIOU-${student.registrationId} at ABL, MCB or Alfalah banks. Kindly share a picture or screenshot of the payment receipt once deposited so we can log it.\n\nThank you,\nAcademic Administrative Support`;
+        return `Dear ${student.studentName},\n\nThis is a friendly reminder from AIOU Support regarding your outstanding dues for the ${student.programSelected} program.\n\n*Service Charges Breakdown*:\n- Total Receivable Service Charges: Rs. ${student.totalReceivable?.toLocaleString()}\n- Total Paid: Rs. ${totalPaid.toLocaleString()}\n- *Outstanding Balance: Rs. ${balance.toLocaleString()}*\n\nPlease deposit your outstanding dues using Challan No: AIOU-${student.registrationId} at ABL, MCB or Alfalah banks. Kindly share a picture or screenshot of the payment receipt once deposited so we can log it.\n\nThank you,\nAcademic Administrative Support`;
       case 'deadline':
         return `Dear ${student.studentName},\n\nWe would like to remind you that several assignments, quizzes, or workshop checkpoints for your ${student.programSelected} program courses are currently showing as incomplete in our student tracking records.\n\n*LMS Portal Login Details*:\n- Portal URL: https://academic.aiou.edu.pk\n- Registration ID/Login: ${student.registrationId}\n- LMS Password ID: ${student.lmsPasswordId || 'Check Profile'}\n- CMS Password ID: ${student.cmsPasswordId || 'Check Profile'}\n\nPlease update your submissions at your earliest convenience to maintain passing grades. For any technical support, feel free to reply.\n\nBest regards,\nAIOU Support Desk`;
       case 'workshop':
@@ -398,10 +398,9 @@ export default function StudentDetails({
       ['Status', student.status.toUpperCase()],
       ['', ''],
       ['FINANCIAL SUMMARY', ''],
-      ['Total Receivable Fees', `Rs. ${student.totalReceivable}`],
+      ['Total Receivable Service Charges', `Rs. ${student.totalReceivable}`],
       ['Total Received Over Time', `Rs. ${totalPaid}`],
       ['Remaining Balance due', `Rs. ${balance}`],
-      ['Service Charges Amount', `Rs. ${student.serviceChargesAmount || 0}`],
       ['Remarks', student.remarks || 'N/A'],
       ['', ''],
       ['SERVICES REQUIRED CHECKLIST', ''],
@@ -454,8 +453,7 @@ export default function StudentDetails({
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 15);
 
-  const tuitionFee = student.totalReceivable - (student.serviceChargesAmount || 0);
-  const supportFee = student.serviceChargesAmount || 0;
+
 
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6">
@@ -680,15 +678,11 @@ export default function StudentDetails({
                   <span>Amount</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Course Tuition & Admission Fee</span>
-                  <span>Rs. {tuitionFee.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Administrative Support services</span>
-                  <span>Rs. {supportFee.toLocaleString()}</span>
+                  <span>Receivable Service Charges</span>
+                  <span>Rs. {student.totalReceivable?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between border-t border-dashed pt-1.5 font-extrabold text-gray-900 text-xs">
-                  <span>Total Payable Fees:</span>
+                  <span>Total Payable Charges:</span>
                   <span>Rs. {student.totalReceivable?.toLocaleString()}</span>
                 </div>
               </div>
@@ -937,18 +931,9 @@ export default function StudentDetails({
                     {editingSemFinance === sem.semesterNumber ? (
                       <div className="interactive-actions bg-white p-4 rounded-xl border border-gray-200 space-y-3 shadow-3xs mb-4">
                         <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block">
-                          Update Receivable Fees
+                          Update Receivable Service Charges
                         </span>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Semester Tuition Fee (Rs.)</label>
-                            <input
-                              type="number"
-                              value={semFeeInput}
-                              onChange={(e) => setSemFeeInput(e.target.value)}
-                              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono"
-                            />
-                          </div>
+                        <div className="space-y-3">
                           <div>
                             <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Service Charges (Rs.)</label>
                             <input
@@ -963,7 +948,7 @@ export default function StudentDetails({
                           <button
                             type="button"
                             onClick={() => {
-                              const fee = parseFloat(semFeeInput) || 0;
+                              const fee = 0; // Fee is removed as requested
                               const charges = parseFloat(semChargesInput) || 0;
                               // Retain existing payments total received
                               const paid = sem.paymentsList?.reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -982,24 +967,15 @@ export default function StudentDetails({
                         <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-3xs flex flex-col justify-between">
                           <div>
                             <span className="block text-[10px] text-gray-400 font-extrabold uppercase tracking-wide">
-                              Total Receivable Payment
+                              Receivable Service Charges
                             </span>
                             <span className="text-base font-black text-gray-900 mt-1 block">
-                              Rs. {((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0)).toLocaleString()}
+                              Rs. {(sem.semesterServiceCharges || 0).toLocaleString()}
                             </span>
                           </div>
                           <div className="mt-3 pt-2.5 border-t border-gray-100 text-[10px] text-gray-500 space-y-1">
-                            <div className="flex justify-between">
-                              <span>Tuition Fee:</span>
-                              <span className="font-bold text-gray-700">Rs. {(sem.semesterFee || 0).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Service Charges:</span>
-                              <span className="font-bold text-gray-700">Rs. {(sem.semesterServiceCharges || 0).toLocaleString()}</span>
-                            </div>
-                            
                             {/* Selected Services breakdown */}
-                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200">
+                            <div className="pt-0.5">
                               <span className="font-semibold block text-[9px] text-gray-400 uppercase tracking-wider mb-1">
                                 Services Provided:
                               </span>
@@ -1066,7 +1042,7 @@ export default function StudentDetails({
                               Remaining Payment Due
                             </span>
                             {(() => {
-                              const remaining = Math.max(0, ((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0)) - (sem.semesterPaidAmount || 0));
+                              const remaining = Math.max(0, (sem.semesterServiceCharges || 0) - (sem.semesterPaidAmount || 0));
                               return (
                                 <>
                                   <span className={`text-base font-black mt-1 block ${remaining > 0 ? 'text-amber-600' : 'text-green-600'}`}>
