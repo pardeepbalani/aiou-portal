@@ -60,9 +60,9 @@ export default function StudentDetails({
 
   // Per-semester payment collection and action states
   const [activePaymentSemNum, setActivePaymentSemNum] = useState<number | null>(null);
-  const [newPaymentAmount, setNewPaymentAmount] = useState('');
-  const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newPaymentRef, setNewPaymentRef] = useState('');
+  const [newPaymentAmounts, setNewPaymentAmounts] = useState<Record<number, string>>({});
+  const [newPaymentDates, setNewPaymentDates] = useState<Record<number, string>>({});
+  const [newPaymentRefs, setNewPaymentRefs] = useState<Record<number, string>>({});
 
   const handleSaveSemesterFinance = async (
     semNum: number,
@@ -913,11 +913,11 @@ export default function StudentDetails({
                   )}
 
                   {/* Semester Financial Section */}
-                  <div className="mt-4 pt-3 border-t border-gray-200 text-xs">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-gray-700 flex items-center gap-1.5">
-                        <Coins size={14} className="text-emerald-600" />
-                        <span>Semester Financials</span>
+                  <div className="mt-6 pt-5 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-3 bg-gray-100/60 p-2.5 rounded-lg border border-gray-200">
+                      <span className="font-extrabold text-xs text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Coins size={15} className="text-emerald-600" />
+                        <span>Semester {sem.semesterNumber} Payment & Service Charges</span>
                       </span>
                       <button
                         type="button"
@@ -927,83 +927,169 @@ export default function StudentDetails({
                           setSemChargesInput(sem.semesterServiceCharges?.toString() || '0');
                           setSemPaidInput(sem.semesterPaidAmount?.toString() || '0');
                         }}
-                        className="interactive-actions text-[10px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                        className="interactive-actions text-[10px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border shadow-3xs"
                       >
                         <Edit3 size={11} />
-                        <span>{editingSemFinance === sem.semesterNumber ? 'Cancel' : 'Update'}</span>
+                        <span>{editingSemFinance === sem.semesterNumber ? 'Cancel' : 'Update Fees'}</span>
                       </button>
                     </div>
 
                     {editingSemFinance === sem.semesterNumber ? (
-                      <div className="interactive-actions bg-white p-3 rounded-lg border border-gray-200 space-y-3">
-                        <div className="grid grid-cols-3 gap-2">
+                      <div className="interactive-actions bg-white p-4 rounded-xl border border-gray-200 space-y-3 shadow-3xs mb-4">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block">
+                          Update Receivable Fees
+                        </span>
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Semester Fee (Rs.)</label>
+                            <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Semester Tuition Fee (Rs.)</label>
                             <input
                               type="number"
                               value={semFeeInput}
                               onChange={(e) => setSemFeeInput(e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs font-mono"
+                              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono"
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Service Charges (Rs.)</label>
+                            <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Service Charges (Rs.)</label>
                             <input
                               type="number"
                               value={semChargesInput}
                               onChange={(e) => setSemChargesInput(e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[9px] font-bold text-gray-500 uppercase mb-1">Paid Amount (Rs.)</label>
-                            <input
-                              type="number"
-                              value={semPaidInput}
-                              onChange={(e) => setSemPaidInput(e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs font-mono"
+                              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono"
                             />
                           </div>
                         </div>
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 pt-1">
                           <button
                             type="button"
                             onClick={() => {
                               const fee = parseFloat(semFeeInput) || 0;
                               const charges = parseFloat(semChargesInput) || 0;
-                              const paid = parseFloat(semPaidInput) || 0;
+                              // Retain existing payments total received
+                              const paid = sem.paymentsList?.reduce((sum, p) => sum + p.amount, 0) || 0;
                               handleSaveSemesterFinance(sem.semesterNumber, fee, charges, paid);
                             }}
-                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
                           >
-                            <Check size={12} />
+                            <Check size={13} />
                             <span>Save Financials</span>
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-3xs">
-                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Fee</span>
-                          <span className="font-extrabold text-gray-900 font-mono">Rs. {(sem.semesterFee || 0).toLocaleString()}</span>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-4">
+                        {/* 1. Total Receivable Card */}
+                        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-3xs flex flex-col justify-between">
+                          <div>
+                            <span className="block text-[10px] text-gray-400 font-extrabold uppercase tracking-wide">
+                              Total Receivable Payment
+                            </span>
+                            <span className="text-base font-black text-gray-900 mt-1 block">
+                              Rs. {((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0)).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-gray-100 text-[10px] text-gray-500 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Tuition Fee:</span>
+                              <span className="font-bold text-gray-700">Rs. {(sem.semesterFee || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Service Charges:</span>
+                              <span className="font-bold text-gray-700">Rs. {(sem.semesterServiceCharges || 0).toLocaleString()}</span>
+                            </div>
+                            
+                            {/* Selected Services breakdown */}
+                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200">
+                              <span className="font-semibold block text-[9px] text-gray-400 uppercase tracking-wider mb-1">
+                                Services Provided:
+                              </span>
+                              {(() => {
+                                const selected = [
+                                  { id: 'serviceEnrollment', label: 'Enrollment Support' },
+                                  { id: 'serviceWorkshops', label: 'Workshops Handling' },
+                                  { id: 'serviceQuiz', label: 'Online Quizzes' },
+                                  { id: 'serviceAssignments', label: 'Assignments Submission' },
+                                  { id: 'servicePhysicalWorkshop', label: 'Physical Workshop' },
+                                  { id: 'serviceResearchReport', label: 'Research Report Assistance' },
+                                ].filter(s => !!(sem as any)[s.id]);
+
+                                if (selected.length === 0) {
+                                  return <span className="text-gray-400 italic text-[9px]">No services selected.</span>;
+                                }
+                                return (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {selected.map(s => (
+                                      <span key={s.id} className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[8px] font-bold px-1 py-0.5 rounded">
+                                        {s.label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
                         </div>
-                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-3xs">
-                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Service Charges</span>
-                          <span className="font-extrabold text-gray-700 font-mono">Rs. {(sem.semesterServiceCharges || 0).toLocaleString()}</span>
+
+                        {/* 2. Total Received Card */}
+                        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-3xs flex flex-col justify-between">
+                          <div>
+                            <span className="block text-[10px] text-gray-400 font-extrabold uppercase tracking-wide">
+                              Total Received
+                            </span>
+                            <span className="text-base font-black text-emerald-700 mt-1 block">
+                              Rs. {(sem.semesterPaidAmount || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-gray-100 text-[10px] text-gray-500">
+                            <span className="block mb-1 font-semibold text-gray-400 text-[9px] uppercase tracking-wider">
+                              Payment Transactions:
+                            </span>
+                            {sem.paymentsList && sem.paymentsList.length > 0 ? (
+                              <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                                {sem.paymentsList.map((p, pIdx) => (
+                                  <div key={p.id || pIdx} className="flex justify-between items-center text-[9px] py-0.5 border-b border-gray-100 last:border-0">
+                                    <span className="text-gray-600 font-bold">{p.date}:</span>
+                                    <span className="text-emerald-700 font-extrabold">Rs. {p.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="italic text-gray-400 text-[9px]">No transactions.</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-3xs">
-                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Paid</span>
-                          <span className="font-extrabold text-emerald-700 font-mono">Rs. {(sem.semesterPaidAmount || 0).toLocaleString()}</span>
-                        </div>
-                        <div className={`p-2 rounded-lg border shadow-3xs ${
-                          ((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0) - (sem.semesterPaidAmount || 0)) > 0
-                            ? 'bg-amber-50/50 border-amber-200 text-amber-800'
-                            : 'bg-green-50/50 border-green-200 text-green-800'
-                        }`}>
-                          <span className="block text-[9px] text-gray-400 font-bold uppercase">Balance</span>
-                          <span className="font-extrabold font-mono">
-                            Rs. {((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0) - (sem.semesterPaidAmount || 0)).toLocaleString()}
-                          </span>
+
+                        {/* 3. Remaining Payment Due Card */}
+                        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-3xs flex flex-col justify-between">
+                          <div>
+                            <span className="block text-[10px] text-gray-400 font-extrabold uppercase tracking-wide">
+                              Remaining Payment Due
+                            </span>
+                            {(() => {
+                              const remaining = Math.max(0, ((sem.semesterFee || 0) + (sem.semesterServiceCharges || 0)) - (sem.semesterPaidAmount || 0));
+                              return (
+                                <>
+                                  <span className={`text-base font-black mt-1 block ${remaining > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                                    Rs. {remaining.toLocaleString()}
+                                  </span>
+                                  <div className="mt-2">
+                                    {remaining > 0 ? (
+                                      <span className="inline-block bg-amber-50 text-amber-800 border border-amber-100 font-extrabold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                        Pending Balance
+                                      </span>
+                                    ) : (
+                                      <span className="inline-block bg-green-50 text-green-800 border border-green-100 font-extrabold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                                        Fully Settled
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <div className="mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-400 italic">
+                            *Reflected directly against this semester.
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1088,8 +1174,8 @@ export default function StudentDetails({
                             <input
                               type="number"
                               placeholder="e.g. 5000"
-                              value={newPaymentAmount}
-                              onChange={(e) => setNewPaymentAmount(e.target.value)}
+                              value={newPaymentAmounts[sem.semesterNumber] || ''}
+                              onChange={(e) => setNewPaymentAmounts(prev => ({ ...prev, [sem.semesterNumber]: e.target.value }))}
                               className="w-full px-2 py-1 border border-gray-300 rounded-md bg-white font-mono text-xs"
                             />
                           </div>
@@ -1097,8 +1183,8 @@ export default function StudentDetails({
                             <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Date</label>
                             <input
                               type="date"
-                              value={newPaymentDate}
-                              onChange={(e) => setNewPaymentDate(e.target.value)}
+                              value={newPaymentDates[sem.semesterNumber] || new Date().toISOString().split('T')[0]}
+                              onChange={(e) => setNewPaymentDates(prev => ({ ...prev, [sem.semesterNumber]: e.target.value }))}
                               className="w-full px-2 py-1 border border-gray-300 rounded-md bg-white font-mono text-xs"
                             />
                           </div>
@@ -1108,22 +1194,25 @@ export default function StudentDetails({
                           <input
                             type="text"
                             placeholder="e.g. CH-1031"
-                            value={newPaymentRef}
-                            onChange={(e) => setNewPaymentRef(e.target.value)}
+                            value={newPaymentRefs[sem.semesterNumber] || ''}
+                            onChange={(e) => setNewPaymentRefs(prev => ({ ...prev, [sem.semesterNumber]: e.target.value }))}
                             className="w-full px-2 py-1 border border-gray-300 rounded-md bg-white font-mono text-xs"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            const amt = parseFloat(newPaymentAmount);
+                            const semAmtStr = newPaymentAmounts[sem.semesterNumber] || '';
+                            const amt = parseFloat(semAmtStr);
                             if (isNaN(amt) || amt <= 0) {
                               alert('Please enter a valid amount.');
                               return;
                             }
-                            handleAddSemesterPayment(sem.semesterNumber, amt, newPaymentDate, newPaymentRef);
-                            setNewPaymentAmount('');
-                            setNewPaymentRef('');
+                            const semDate = newPaymentDates[sem.semesterNumber] || new Date().toISOString().split('T')[0];
+                            const semRef = newPaymentRefs[sem.semesterNumber] || '';
+                            handleAddSemesterPayment(sem.semesterNumber, amt, semDate, semRef);
+                            setNewPaymentAmounts(prev => ({ ...prev, [sem.semesterNumber]: '' }));
+                            setNewPaymentRefs(prev => ({ ...prev, [sem.semesterNumber]: '' }));
                             setActivePaymentSemNum(null);
                           }}
                           className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-md text-[11px] flex items-center justify-center gap-1 cursor-pointer"

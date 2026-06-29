@@ -77,8 +77,8 @@ export default function EnrollmentForm({
   const [serviceResearchReport, setServiceResearchReport] = useState(false);
 
   // New Payment Temp Input State
-  const [newPaymentAmount, setNewPaymentAmount] = useState('');
-  const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newPaymentAmounts, setNewPaymentAmounts] = useState<Record<number, string>>({});
+  const [newPaymentDates, setNewPaymentDates] = useState<Record<number, string>>({});
 
   // Error & Status State
   const [formError, setFormError] = useState('');
@@ -193,20 +193,22 @@ export default function EnrollmentForm({
 
   // Add Payment Entry
   const handleAddPayment = () => {
-    const amt = parseFloat(newPaymentAmount);
+    const semAmtStr = newPaymentAmounts[activeSemTab] || '';
+    const amt = parseFloat(semAmtStr);
     if (isNaN(amt) || amt <= 0) {
       alert('Please enter a valid payment amount.');
       return;
     }
+    const semDate = newPaymentDates[activeSemTab] || new Date().toISOString().split('T')[0];
     const newEntry: PaymentEntry = {
       id: Math.random().toString(36).substring(2, 9),
-      date: newPaymentDate,
+      date: semDate,
       amount: amt
     };
     setPaymentsList([...paymentsList, newEntry]);
-    setNewPaymentAmount('');
+    setNewPaymentAmounts(prev => ({ ...prev, [activeSemTab]: '' }));
     // reset to today's date
-    setNewPaymentDate(new Date().toISOString().split('T')[0]);
+    setNewPaymentDates(prev => ({ ...prev, [activeSemTab]: new Date().toISOString().split('T')[0] }));
   };
 
   // Remove Payment Entry
@@ -771,8 +773,8 @@ export default function EnrollmentForm({
                           <label className="block text-[9px] font-bold text-gray-500 mb-1">Amount (Rs)</label>
                           <input
                             type="number"
-                            value={newPaymentAmount}
-                            onChange={(e) => setNewPaymentAmount(e.target.value)}
+                            value={newPaymentAmounts[activeSemTab] || ''}
+                            onChange={(e) => setNewPaymentAmounts(prev => ({ ...prev, [activeSemTab]: e.target.value }))}
                             placeholder="e.g. 5000"
                             className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-hidden"
                           />
@@ -781,8 +783,8 @@ export default function EnrollmentForm({
                           <label className="block text-[9px] font-bold text-gray-500 mb-1">Date</label>
                           <input
                             type="date"
-                            value={newPaymentDate}
-                            onChange={(e) => setNewPaymentDate(e.target.value)}
+                            value={newPaymentDates[activeSemTab] || new Date().toISOString().split('T')[0]}
+                            onChange={(e) => setNewPaymentDates(prev => ({ ...prev, [activeSemTab]: e.target.value }))}
                             className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-hidden"
                           />
                         </div>
@@ -790,14 +792,16 @@ export default function EnrollmentForm({
                       <button
                         type="button"
                         onClick={() => {
-                          const amt = parseFloat(newPaymentAmount);
+                          const semAmtStr = newPaymentAmounts[activeSemTab] || '';
+                          const amt = parseFloat(semAmtStr);
                           if (isNaN(amt) || amt <= 0) {
                             alert('Please enter a valid payment amount.');
                             return;
                           }
+                          const semDate = newPaymentDates[activeSemTab] || new Date().toISOString().split('T')[0];
                           const newEntry: PaymentEntry = {
                             id: Math.random().toString(36).substring(2, 9),
-                            date: newPaymentDate,
+                            date: semDate,
                             amount: amt
                           };
                           const updated = [...semesters];
@@ -806,7 +810,7 @@ export default function EnrollmentForm({
                           sem.paymentsList = [...pList, newEntry];
                           sem.semesterPaidAmount = sem.paymentsList.reduce((sum, p) => sum + p.amount, 0);
                           setSemesters(updated);
-                          setNewPaymentAmount('');
+                          setNewPaymentAmounts(prev => ({ ...prev, [activeSemTab]: '' }));
                         }}
                         className={`w-full py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 text-white ${
                           isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
@@ -859,27 +863,43 @@ export default function EnrollmentForm({
                     </div>
 
                     {/* Payment Summary Balances for this Semester */}
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col">
-                        <span className="text-[10px] font-bold text-emerald-800 uppercase">Paid Amount</span>
-                        <span className="text-sm font-extrabold text-emerald-900 mt-1">
-                          Rs. {(semesters[activeSemTab - 1].semesterPaidAmount || 0).toLocaleString()}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                      {/* Total Receivable */}
+                      <div className="p-3 bg-white rounded-xl border border-gray-200 flex flex-col shadow-3xs">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Total Receivable</span>
+                        <span className="text-sm font-extrabold text-gray-900 mt-1">
+                          Rs. {((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0)).toLocaleString()}
+                        </span>
+                        <span className="text-[9px] text-gray-400 mt-1 block">
+                          Fee: Rs. {(semesters[activeSemTab - 1].semesterFee || 0).toLocaleString()} | Service: Rs. {(semesters[activeSemTab - 1].semesterServiceCharges || 0).toLocaleString()}
                         </span>
                       </div>
-                      <div className={`p-3 rounded-xl border flex flex-col ${
-                        ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 
-                          ? 'bg-amber-50 border-amber-200' 
-                          : 'bg-green-50 border-green-200'
-                      }`}>
-                        <span className={`text-[10px] font-bold uppercase ${
-                          ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'text-amber-800' : 'text-green-800'
-                        }`}>
-                          {((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'Semester Balance' : 'Fully Paid'}
+                      
+                      {/* Paid Amount */}
+                      <div className="p-3 bg-white rounded-xl border border-gray-200 flex flex-col shadow-3xs">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Total Received</span>
+                        <span className="text-sm font-extrabold text-emerald-700 mt-1">
+                          Rs. {(semesters[activeSemTab - 1].semesterPaidAmount || 0).toLocaleString()}
                         </span>
-                        <span className={`text-sm font-extrabold mt-1 ${
-                          ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'text-amber-900' : 'text-green-900'
-                        }`}>
+                        <span className="text-[9px] text-gray-400 mt-1 block">
+                          From ledger transactions
+                        </span>
+                      </div>
+
+                      {/* Remaining Balance */}
+                      <div className={`p-3 rounded-xl border flex flex-col shadow-3xs ${
+                        ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 
+                          ? 'bg-amber-50 border-amber-200 text-amber-900' 
+                          : 'bg-green-50 border-green-200 text-green-900'
+                      }`}>
+                        <span className="text-[10px] font-bold uppercase tracking-wide">
+                          {((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0)) > 0 ? 'Remaining Due' : 'Fully Paid'}
+                        </span>
+                        <span className="text-sm font-extrabold mt-1">
                           Rs. {Math.max(0, ((semesters[activeSemTab - 1].semesterFee || 0) + (semesters[activeSemTab - 1].semesterServiceCharges || 0) - (semesters[activeSemTab - 1].semesterPaidAmount || 0))).toLocaleString()}
+                        </span>
+                        <span className="text-[9px] text-gray-400 mt-1 block">
+                          Pending semester balance
                         </span>
                       </div>
                     </div>
