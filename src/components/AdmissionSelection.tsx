@@ -15,9 +15,9 @@ export default function AdmissionSelection({
 
   // Return appropriate decorative badge/details for program types
   const getProgramIcon = (program: string) => {
-    if (program.includes('B.Ed')) return <GraduationCap size={24} />;
-    if (program.includes('B.A') || program.includes('B.Com')) return <Award size={24} />;
-    return <BookOpen size={24} />;
+    if (program.includes('B.Ed')) return <GraduationCap size={24} className="text-orange-500 fill-orange-100" />;
+    if (program.includes('B.A') || program.includes('B.Com')) return <Award size={24} className="text-amber-500 fill-amber-100" />;
+    return <BookOpen size={24} className="text-blue-500 fill-blue-100" />;
   };
 
   return (

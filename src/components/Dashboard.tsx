@@ -110,7 +110,7 @@ export default function Dashboard({
           <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${
             isGreen ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-sky-50 text-sky-700 border border-sky-200'
           }`}>
-            <Sparkles size={12} className="animate-pulse" />
+            <Sparkles size={12} className="animate-pulse text-yellow-500 fill-yellow-250" />
             <span>Academic Intake 2026</span>
           </span>
         </div>
@@ -121,7 +121,7 @@ export default function Dashboard({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-50 pb-2.5">
           <div>
             <h3 className="text-sm font-extrabold text-gray-800 flex items-center gap-1.5">
-              <Search size={16} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
+              <Search size={16} className={isGreen ? 'text-emerald-500 fill-emerald-100 font-bold' : 'text-sky-500 fill-sky-100' } />
               <span>Real-Time Student Lookup & Credentials Finder</span>
             </h3>
             <p className="text-[11px] text-gray-400">
@@ -140,7 +140,7 @@ export default function Dashboard({
 
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-            <Search size={18} />
+            <Search size={18} className="text-purple-500 font-bold" />
           </div>
           <input
             type="text"
@@ -222,7 +222,7 @@ export default function Dashboard({
           <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
             isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
           }`}>
-            <UserPlus size={28} />
+            <UserPlus size={28} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
           </div>
           <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
             Enroll New Student Record
@@ -245,7 +245,7 @@ export default function Dashboard({
           <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
             isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
           }`}>
-            <FolderOpen size={28} />
+            <FolderOpen size={28} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
           </div>
           <h3 className="text-lg font-bold text-gray-900 group-hover:text-sky-700 transition-colors">
             Previously Enrolled Directory
@@ -268,7 +268,7 @@ export default function Dashboard({
           <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
             isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
           }`}>
-            <GraduationCap size={28} />
+            <GraduationCap size={28} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
           </div>
           <h3 className="text-lg font-bold text-gray-900 group-hover:text-purple-700 transition-colors">
             Exam Records
@@ -287,7 +287,7 @@ export default function Dashboard({
           <div>
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-50">
               <h4 className="text-sm font-extrabold text-gray-800 flex items-center gap-1.5">
-                <Users size={16} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
+                <Users size={16} className={isGreen ? 'text-emerald-500 fill-emerald-100' : 'text-sky-500 fill-sky-100'} />
                 <span>Student Roster Stats</span>
               </h4>
               <span className="text-[10px] font-mono text-gray-400">Total Enrolled: {stats.totalStudents}</span>
@@ -356,7 +356,7 @@ export default function Dashboard({
           <div>
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-50">
               <h4 className="text-sm font-extrabold text-gray-800 flex items-center gap-1.5">
-                <Coins size={16} className="text-amber-500" />
+                <Coins size={16} className="text-amber-500 fill-amber-100" />
                 <span>Financial Collections Audit</span>
               </h4>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isGreen ? 'bg-emerald-50 text-emerald-800' : 'bg-sky-50 text-sky-800'}`}>
@@ -408,7 +408,7 @@ export default function Dashboard({
           <div>
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-50">
               <h4 className="text-sm font-extrabold text-gray-800 flex items-center gap-1.5">
-                <BookOpen size={16} className="text-purple-600" />
+                <BookOpen size={16} className="text-purple-500 fill-purple-100" />
                 <span>Program Intake Ratios</span>
               </h4>
               <span className="text-[10px] font-mono text-gray-400">Programs: {programData.length}</span>
@@ -451,7 +451,7 @@ export default function Dashboard({
       <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-3xs">
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
           <h4 className="text-sm font-extrabold text-gray-800 flex items-center gap-1.5">
-            <Activity size={16} className="text-rose-500" />
+            <Activity size={16} className="text-rose-500 fill-rose-100" />
             <span>Interactive Service Package Adoption Breakdown</span>
           </h4>
           <span className="text-[10px] text-gray-400 uppercase tracking-widest font-mono">Real-time counts</span>

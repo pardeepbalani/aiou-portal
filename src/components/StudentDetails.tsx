@@ -508,7 +508,7 @@ export default function StudentDetails({
             onClick={onClose}
             className="flex items-center gap-2 px-3.5 py-2 text-sm font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={16} className="text-gray-500 font-bold" />
             <span>Back to Directory</span>
           </button>
           
@@ -519,7 +519,7 @@ export default function StudentDetails({
               isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
             }`}
           >
-            <Edit3 size={16} />
+            <Edit3 size={16} className="text-white fill-white/20 font-bold" />
             <span>Edit Information</span>
           </button>
         </div>
@@ -538,7 +538,7 @@ export default function StudentDetails({
                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
             }`}
           >
-            <Receipt size={14} className="text-rose-600" />
+            <Receipt size={14} className="text-rose-600 fill-rose-100" />
             <span>{challanModeActive ? 'Exit Challan Mode' : 'Print AIOU Challan'}</span>
           </button>
 
@@ -554,7 +554,7 @@ export default function StudentDetails({
                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
             }`}
           >
-            <FileText size={14} className="text-amber-600" />
+            <FileText size={14} className="text-amber-600 fill-amber-100" />
             <span>{pdfModeActive ? 'Exit Transcript Layout' : 'Toggle Official Transcript'}</span>
           </button>
 
@@ -563,7 +563,7 @@ export default function StudentDetails({
             onClick={handleExportToCSV}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-white border border-gray-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-200 rounded-lg text-gray-700 transition-all cursor-pointer"
           >
-            <FileSpreadsheet size={14} className="text-emerald-600" />
+            <FileSpreadsheet size={14} className="text-emerald-600 fill-emerald-100" />
             <span>Export to Excel</span>
           </button>
 
@@ -572,7 +572,7 @@ export default function StudentDetails({
             onClick={handlePrintScreen}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-white border border-gray-200 hover:bg-sky-50 hover:text-sky-800 hover:border-sky-200 rounded-lg text-gray-700 transition-all cursor-pointer"
           >
-            <Printer size={14} className="text-sky-600" />
+            <Printer size={14} className="text-sky-600 fill-sky-100" />
             <span>Print Current Page</span>
           </button>
         </div>
@@ -629,15 +629,15 @@ export default function StudentDetails({
               {/* Bank accounts */}
               <div className="text-[9px] text-gray-500 font-mono space-y-1 mb-3.5 leading-tight">
                 <div className="flex items-center gap-1">
-                  <Building size={10} className="text-gray-400" />
+                  <Building size={10} className="text-indigo-500 fill-indigo-100" />
                   <span>ABL A/C: 1012-002012920</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Building size={10} className="text-gray-400" />
+                  <Building size={10} className="text-blue-500 fill-blue-100" />
                   <span>MCB A/C: 0582-901841289</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Building size={10} className="text-gray-400" />
+                  <Building size={10} className="text-sky-500 fill-sky-100" />
                   <span>Alfalah A/C: 5081-301931813</span>
                 </div>
               </div>
@@ -910,7 +910,7 @@ export default function StudentDetails({
                   <div className="mt-6 pt-5 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-3 bg-gray-100/60 p-2.5 rounded-lg border border-gray-200">
                       <span className="font-extrabold text-xs text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Coins size={15} className="text-emerald-600" />
+                        <Coins size={15} className="text-emerald-500 fill-emerald-100" />
                         <span>Semester {sem.semesterNumber} Payment & Service Charges</span>
                       </span>
                       <button
@@ -923,7 +923,7 @@ export default function StudentDetails({
                         }}
                         className="interactive-actions text-[10px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border shadow-3xs"
                       >
-                        <Edit3 size={11} />
+                        <Edit3 size={11} className="text-emerald-600 fill-emerald-100" />
                         <span>{editingSemFinance === sem.semesterNumber ? 'Cancel' : 'Update Fees'}</span>
                       </button>
                     </div>
@@ -956,7 +956,7 @@ export default function StudentDetails({
                             }}
                             className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
                           >
-                            <Check size={13} />
+                            <Check size={13} className="text-white font-bold" />
                             <span>Save Financials</span>
                           </button>
                         </div>
@@ -1097,7 +1097,7 @@ export default function StudentDetails({
                             >
                               <span className={val ? 'text-gray-800 font-semibold' : 'text-gray-400'}>{service.label}</span>
                               <div className={val ? 'text-emerald-600' : 'text-gray-300'}>
-                                {val ? <CheckSquare size={15} /> : <Square size={15} />}
+                                {val ? <CheckSquare size={15} className="text-emerald-500 fill-emerald-100" /> : <Square size={15} className="text-gray-305" />}
                               </div>
                             </button>
                           );
@@ -1136,7 +1136,7 @@ export default function StudentDetails({
                         onClick={() => setActivePaymentSemNum(activePaymentSemNum === sem.semesterNumber ? null : sem.semesterNumber)}
                         className="interactive-actions text-[10px] font-extrabold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
                       >
-                        <Plus size={12} />
+                        <Plus size={12} className="text-emerald-500 font-bold" />
                         <span>{activePaymentSemNum === sem.semesterNumber ? 'Close' : 'Record Payment'}</span>
                       </button>
                     </div>
@@ -1193,7 +1193,7 @@ export default function StudentDetails({
                           }}
                           className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-md text-[11px] flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <Check size={12} />
+                          <Check size={12} className="text-white font-bold" />
                           <span>Save Payment to Semester {sem.semesterNumber}</span>
                         </button>
                       </div>
@@ -1214,7 +1214,7 @@ export default function StudentDetails({
                               className="text-red-500 hover:text-red-700 p-1 cursor-pointer transition-colors"
                               title="Delete payment entry"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={12} className="text-red-500 fill-red-100" />
                             </button>
                           </div>
                         ))}
@@ -1234,7 +1234,7 @@ export default function StudentDetails({
           <div className="mb-4">
             <div className="interactive-actions bg-white p-5 rounded-xl border border-gray-200 shadow-2xs space-y-3.5 max-w-2xl mx-auto">
               <div className="flex items-center gap-1.5 border-b border-gray-100 pb-2">
-                <MessageSquare size={16} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
+                <MessageSquare size={16} className={isGreen ? 'text-emerald-500 fill-emerald-100' : 'text-sky-500 fill-sky-100'} />
                 <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
                   Smart Reminders & Alerts Hub
                 </span>
@@ -1286,12 +1286,12 @@ export default function StudentDetails({
                 >
                   {copied ? (
                     <>
-                      <Check size={14} className="text-green-600" />
+                      <Check size={14} className="text-green-500 fill-green-100" />
                       <span className="text-green-700">Copied!</span>
                     </>
                   ) : (
                     <>
-                      <Copy size={13} />
+                      <Copy size={13} className="text-gray-600 font-bold" />
                       <span>Copy Message</span>
                     </>
                   )}
@@ -1306,7 +1306,7 @@ export default function StudentDetails({
                     isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
                   }`}
                 >
-                  <Send size={13} />
+                  <Send size={13} className="text-white fill-white/20 font-bold" />
                   <span>Send on WhatsApp</span>
                 </a>
               </div>

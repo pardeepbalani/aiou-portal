@@ -330,7 +330,7 @@ export default function EnrollmentForm({
               isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
             } disabled:opacity-50`}
           >
-            <Save size={16} />
+            <Save size={16} className="text-white fill-white/20 font-bold" />
             <span>{saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Record'}</span>
           </button>
         </div>
@@ -339,7 +339,7 @@ export default function EnrollmentForm({
       {/* Success Banner */}
       {saveSuccess && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl flex items-center gap-3">
-          <CheckCircle2 size={24} className="text-green-600" />
+          <CheckCircle2 size={24} className="text-green-500 fill-green-100" />
           <div>
             <p className="font-bold">Record saved successfully!</p>
             <p className="text-sm">Online storage and offline cache sync complete.</p>
@@ -350,7 +350,7 @@ export default function EnrollmentForm({
       {/* Error Banner */}
       {formError && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl flex items-center gap-3">
-          <AlertCircle size={24} className="text-red-600" />
+          <AlertCircle size={24} className="text-red-500 fill-red-100 animate-pulse" />
           <p className="font-semibold">{formError}</p>
         </div>
       )}
@@ -361,7 +361,7 @@ export default function EnrollmentForm({
         {/* SECTION A: Admission Details & Status */}
         <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs">
           <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-3">
-            <BookOpen className={isGreen ? 'text-emerald-600' : 'text-sky-600'} size={20} />
+            <BookOpen className={isGreen ? 'text-emerald-500 fill-emerald-100 font-bold' : 'text-sky-500 fill-sky-100 font-bold'} size={20} />
             <h3 className="text-lg font-bold text-gray-800">A. Admission Details</h3>
           </div>
 
@@ -468,7 +468,7 @@ export default function EnrollmentForm({
         {/* SECTION C: Personal Information */}
         <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs">
           <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-3">
-            <User className={isGreen ? 'text-emerald-600' : 'text-sky-600'} size={20} />
+            <User className={isGreen ? 'text-emerald-500 fill-emerald-100 font-bold' : 'text-sky-500 fill-sky-100 font-bold'} size={20} />
             <h3 className="text-lg font-bold text-gray-800">C. Personal Information</h3>
           </div>
 
@@ -518,7 +518,7 @@ export default function EnrollmentForm({
         {/* SECTION D: Program IDs */}
         <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs">
           <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-3">
-            <IdCard className={isGreen ? 'text-emerald-600' : 'text-sky-600'} size={20} />
+            <IdCard className={isGreen ? 'text-emerald-500 fill-emerald-100 font-bold' : 'text-sky-500 fill-sky-100 font-bold'} size={20} />
             <h3 className="text-lg font-bold text-gray-800">D. Program IDs</h3>
           </div>
 
@@ -572,7 +572,7 @@ export default function EnrollmentForm({
         <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-6">
             <div className="flex items-center gap-2">
-              <BookOpen className={isGreen ? 'text-emerald-600' : 'text-sky-600'} size={20} />
+              <BookOpen className={isGreen ? 'text-emerald-500 fill-emerald-100 font-bold' : 'text-sky-500 fill-sky-100 font-bold'} size={20} />
               <h3 className="text-lg font-bold text-gray-800">B. Academic Information</h3>
             </div>
             
@@ -582,7 +582,7 @@ export default function EnrollmentForm({
               onClick={() => handleAutoFillCourseCodes(activeSemTab - 1)}
               className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer bg-emerald-50 px-2 py-1 rounded border border-emerald-100"
             >
-              <Sparkles size={12} />
+              <Sparkles size={12} className="text-yellow-500 fill-yellow-250 animate-pulse" />
               <span>Auto-fill course codes</span>
             </button>
           </div>
@@ -717,7 +717,7 @@ export default function EnrollmentForm({
               {/* E. Payment & Service Charges Section inside active semester */}
               <div className="mt-8 pt-6 border-t border-gray-200 space-y-6">
                 <span className="text-sm font-bold text-gray-700 uppercase tracking-wider block mb-3 flex items-center gap-1.5">
-                  <Coins size={16} className="text-emerald-600" />
+                  <Coins size={16} className="text-emerald-500 fill-emerald-100" />
                   <span>E. Payment & Service Charges for Semester {activeSemTab}</span>
                 </span>
 
@@ -801,7 +801,7 @@ export default function EnrollmentForm({
                           isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
                         }`}
                       >
-                        <Plus size={14} />
+                        <Plus size={14} className="text-white font-bold" />
                         <span>Record Payment for Semester {activeSemTab}</span>
                       </button>
                     </div>
@@ -820,7 +820,7 @@ export default function EnrollmentForm({
                           {semesters[activeSemTab - 1].paymentsList!.map((p) => (
                             <div key={p.id} className="flex items-center justify-between p-2.5 bg-white text-xs hover:bg-gray-50">
                               <div className="flex items-center gap-2">
-                                <Calendar size={13} className="text-gray-400" />
+                                <Calendar size={13} className="text-indigo-500 fill-indigo-100" />
                                 <span className="font-mono text-gray-600">{p.date}</span>
                               </div>
                               <div className="flex items-center gap-3">
@@ -838,7 +838,7 @@ export default function EnrollmentForm({
                                   }}
                                   className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                                 >
-                                  <Trash2 size={13} />
+                                  <Trash2 size={13} className="text-red-500 fill-red-100" />
                                 </button>
                               </div>
                             </div>
@@ -928,9 +928,9 @@ export default function EnrollmentForm({
                                 val ? 'text-emerald-600' : 'text-gray-300'
                               }`}>
                                 {val ? (
-                                  <CheckSquare size={18} className="fill-emerald-50 text-emerald-600" />
+                                  <CheckSquare size={18} className={isGreen ? "fill-emerald-50 text-emerald-500" : "fill-sky-50 text-sky-500"} />
                                 ) : (
-                                  <Square size={18} />
+                                  <Square size={18} className="text-gray-300" />
                                 )}
                               </div>
                             </button>
@@ -980,7 +980,7 @@ export default function EnrollmentForm({
               isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
             } disabled:opacity-50`}
           >
-            <Save size={16} />
+            <Save size={16} className="text-white fill-white/20 font-bold" />
             <span>{saving ? 'Saving...' : saveSuccess ? 'Saved successfully!' : 'Save Record Data'}</span>
           </button>
         </div>

@@ -227,7 +227,7 @@ export default function StudentList({
             isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
           }`}
         >
-          <PlusCircle size={16} />
+          <PlusCircle size={16} className="text-white fill-white/20 font-bold" />
           <span>Enroll New Student</span>
         </button>
       </div>
@@ -240,7 +240,7 @@ export default function StudentList({
           {/* Search bar */}
           <div className="flex-1 relative rounded-lg shadow-2xs">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-              <Search size={18} />
+              <Search size={18} className="text-purple-500 font-bold" />
             </div>
             <input
               type="text"
@@ -330,7 +330,7 @@ export default function StudentList({
               </span>
             </div>
             <div className={`p-2 rounded-lg ${isGreen ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'}`}>
-              <Coins size={18} />
+              <Coins size={18} className="text-amber-500 fill-amber-100" />
             </div>
           </div>
 
@@ -342,7 +342,7 @@ export default function StudentList({
               </span>
             </div>
             <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
-              <CheckCircle size={18} />
+              <CheckCircle size={18} className="text-emerald-500 fill-emerald-100" />
             </div>
           </div>
 
@@ -357,7 +357,7 @@ export default function StudentList({
               </span>
             </div>
             <div className="p-2 rounded-lg bg-amber-50 text-amber-700">
-              <TrendingUp size={18} />
+              <TrendingUp size={18} className="text-blue-500" />
             </div>
           </div>
         </div>
@@ -367,7 +367,7 @@ export default function StudentList({
       {filteredRecords.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-150 p-12 text-center shadow-2xs">
           <div className="mx-auto h-12 w-12 text-gray-400 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-            <FolderOpen size={24} />
+            <FolderOpen size={24} className="text-gray-400 fill-gray-100" />
           </div>
           <h3 className="text-lg font-bold text-gray-900">No Records Found</h3>
           <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">
@@ -398,7 +398,7 @@ export default function StudentList({
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer shadow-3xs"
                 title="Export Visible Records to Excel (CSV)"
               >
-                <FileSpreadsheet size={13} className="text-emerald-600" />
+                <FileSpreadsheet size={13} className="text-emerald-500 fill-emerald-50" />
                 <span>Export to Excel</span>
               </button>
 
@@ -408,7 +408,7 @@ export default function StudentList({
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-sky-50 hover:text-sky-800 hover:border-sky-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer shadow-3xs"
                 title="Print Visible Student List"
               >
-                <Printer size={13} className="text-sky-600" />
+                <Printer size={13} className="text-sky-500 fill-sky-50" />
                 <span>Print List</span>
               </button>
               
@@ -446,14 +446,14 @@ export default function StudentList({
                           <div className={`p-2.5 rounded-full ${
                             isGreen ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'
                           }`}>
-                            <User size={16} />
+                            <User size={16} className={isGreen ? 'text-emerald-500 fill-emerald-50' : 'text-sky-500 fill-sky-50'} />
                           </div>
                           <div>
                             <span className="block font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                               {r.studentName}
                             </span>
                             <span className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-                              <Phone size={10} />
+                              <Phone size={10} className="text-blue-500 fill-blue-50" />
                               <span>{r.phoneNumber || 'No phone'}</span>
                             </span>
                           </div>
@@ -472,7 +472,7 @@ export default function StudentList({
                         <div className="text-xs">
                           <span className="font-semibold text-gray-800 block">{r.programSelected}</span>
                           <span className="text-gray-400 flex items-center gap-1 mt-0.5">
-                            <Calendar size={10} />
+                            <Calendar size={10} className="text-indigo-500 fill-indigo-50" />
                             <span>{r.admissionYear} ({r.semesterType})</span>
                           </span>
                         </div>
@@ -524,7 +524,7 @@ export default function StudentList({
                             className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors cursor-pointer"
                             title="Delete Student Record"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={14} className="text-red-500 fill-red-50" />
                           </button>
                         </div>
                       </td>

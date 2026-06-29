@@ -237,7 +237,7 @@ export default function App() {
           <div className="p-4 bg-amber-50 border border-amber-250 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-3xs">
             <div className="flex items-start md:items-center gap-3">
               <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0">
-                <AlertCircle size={20} className="animate-pulse" />
+                <AlertCircle size={20} className="text-amber-500 fill-amber-50 animate-pulse" />
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-amber-950">Firebase Cloud Quota Limit Reached (Running on Offline-Local Mode)</h4>
@@ -269,7 +269,7 @@ export default function App() {
             title="Force refresh & sync with Firestore"
             className="flex items-center gap-1 hover:text-emerald-700 cursor-pointer"
           >
-            <RefreshCcw size={10} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
+            <RefreshCcw size={10} className={`text-emerald-500 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
             <span>Sync</span>
           </button>
         </div>
@@ -372,7 +372,7 @@ export default function App() {
         <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md bg-white/95 backdrop-blur-md border border-emerald-100 rounded-2xl shadow-xl p-5 z-50 animate-fade-in transition-all duration-300">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${isGreen ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'} shrink-0`}>
-              <Smartphone size={24} />
+              <Smartphone size={24} className={isGreen ? 'text-emerald-500 fill-emerald-100' : 'text-sky-500 fill-sky-100'} />
             </div>
             
             <div className="flex-1">
@@ -384,7 +384,7 @@ export default function App() {
                   onClick={handleDismissInstall}
                   className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                 >
-                  <X size={16} />
+                  <X size={16} className="text-gray-500 hover:text-gray-750 font-bold" />
                 </button>
               </div>
               
@@ -412,17 +412,17 @@ export default function App() {
                         : 'bg-sky-600 hover:bg-sky-700 shadow-sky-200'
                     }`}
                   >
-                    <Download size={14} />
+                    <Download size={14} className="text-white fill-white/20 font-bold" />
                     <span>Install App</span>
                   </button>
                 ) : (
                   <div className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-extrabold ${
                     isGreen ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'
                   }`}>
-                    <Share size={12} />
+                    <Share size={12} className={isGreen ? 'text-emerald-500 fill-emerald-100' : 'text-sky-500 fill-sky-100'} />
                     <span>Tap Share</span>
                     <span>→</span>
-                    <PlusSquare size={12} />
+                    <PlusSquare size={12} className={isGreen ? 'text-emerald-500 fill-emerald-100' : 'text-sky-500 fill-sky-100'} />
                     <span>Add to Home Screen</span>
                   </div>
                 )}

@@ -112,7 +112,7 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
               <div className={`mx-auto h-12 w-12 rounded-full flex items-center justify-center ${
                 isGreen ? 'bg-emerald-100 text-emerald-600' : 'bg-sky-100 text-sky-600'
               }`}>
-                <Lock size={24} />
+                <Lock size={24} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
               </div>
               <h2 className="mt-6 text-2xl font-bold text-gray-900 tracking-tight">
                 Sign in to Your Account
@@ -125,7 +125,7 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
             {/* Success message from reset */}
             {resetSuccessMessage && (
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-xl flex items-start gap-2 text-sm">
-                <CheckCircle2 size={18} className="shrink-0 text-emerald-600 mt-0.5" />
+                <CheckCircle2 size={18} className="shrink-0 text-emerald-500 fill-emerald-100 mt-0.5" />
                 <span>{resetSuccessMessage}</span>
               </div>
             )}
@@ -133,7 +133,7 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
             {/* Error message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm">
-                <AlertCircle size={16} className="shrink-0" />
+                <AlertCircle size={16} className="shrink-0 text-red-500 fill-red-100" />
                 <span>{error}</span>
               </div>
             )}
@@ -146,8 +146,8 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                     Username
                   </label>
                   <div className="relative rounded-md shadow-2xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                      <User size={18} />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-teal-400">
+                      <User size={18} className="text-teal-500 fill-teal-100" />
                     </div>
                     <input
                       type="text"
@@ -188,8 +188,8 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                     </button>
                   </div>
                   <div className="relative rounded-md shadow-2xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                      <Lock size={18} />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-400">
+                      <Lock size={18} className="text-purple-500 fill-purple-100" />
                     </div>
                     <input
                       type="password"
@@ -234,7 +234,7 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                 onClick={() => setIsResetMode(false)}
                 className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 cursor-pointer mb-4"
               >
-                <ArrowLeft size={14} />
+                <ArrowLeft size={14} className="text-gray-500 font-extrabold" />
                 <span>Back to Sign In</span>
               </button>
 
@@ -242,7 +242,7 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                 <div className={`mx-auto h-12 w-12 rounded-full flex items-center justify-center ${
                   isGreen ? 'bg-emerald-100 text-emerald-600' : 'bg-sky-100 text-sky-600'
                 }`}>
-                  <KeyRound size={24} />
+                  <KeyRound size={24} className="text-amber-500 fill-amber-100" />
                 </div>
                 <h2 className="mt-4 text-xl font-bold text-gray-900 tracking-tight">
                   Reset Password Portal
@@ -256,7 +256,7 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
             {/* Error message */}
             {resetError && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm animate-shake">
-                <AlertCircle size={16} className="shrink-0" />
+                <AlertCircle size={16} className="shrink-0 text-red-500 fill-red-100" />
                 <span>{resetError}</span>
               </div>
             )}
@@ -299,8 +299,8 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                   Recovery Email Address
                 </label>
                 <div className="relative rounded-md shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <Mail size={16} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-400">
+                    <Mail size={16} className="text-blue-500 fill-blue-50" />
                   </div>
                   <input
                     type="email"
@@ -319,8 +319,8 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                   New Password
                 </label>
                 <div className="relative rounded-md shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <Lock size={16} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-indigo-400">
+                    <Lock size={16} className="text-indigo-500 fill-indigo-50" />
                   </div>
                   <input
                     type="password"
@@ -339,8 +339,8 @@ export default function Login({ onLoginSuccess, theme }: LoginProps) {
                   Confirm New Password
                 </label>
                 <div className="relative rounded-md shadow-2xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <Lock size={16} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-pink-400">
+                    <Lock size={16} className="text-pink-500 fill-pink-50" />
                   </div>
                   <input
                     type="password"

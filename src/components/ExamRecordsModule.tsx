@@ -497,7 +497,7 @@ export default function ExamRecordsModule({
       {/* Toast Alert Banner */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 bg-gray-900/95 text-white text-xs font-bold font-mono px-5 py-3 rounded-xl shadow-xl z-50 flex items-center gap-2 border border-gray-800 backdrop-blur-sm animate-bounce">
-          <Bell size={14} className="text-amber-400 animate-pulse" />
+          <Bell size={14} className="text-amber-500 fill-amber-100 animate-pulse" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -513,7 +513,7 @@ export default function ExamRecordsModule({
             }}
             className="p-2 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-900 hover:shadow-xs transition-all cursor-pointer"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={16} className="text-gray-600 font-bold" />
           </button>
           <div>
             <span className="text-[10px] uppercase tracking-wider font-extrabold text-purple-600 block">Allama Iqbal Open University</span>
@@ -644,7 +644,7 @@ export default function ExamRecordsModule({
                 isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
               }`}
             >
-              <Plus size={14} />
+              <Plus size={14} className="text-white font-bold" />
               <span>Add Exam Manager</span>
             </button>
           </div>
@@ -746,7 +746,7 @@ export default function ExamRecordsModule({
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                            <UserCheck size={18} />
+                            <UserCheck size={18} className="text-purple-500 fill-purple-100" />
                           </div>
                           <div>
                             <h4 className="font-extrabold text-sm text-gray-900 group-hover:text-purple-700 transition-colors">
@@ -766,25 +766,25 @@ export default function ExamRecordsModule({
                             className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-md cursor-pointer"
                             title="Edit Manager"
                           >
-                            <Edit size={12} />
+                            <Edit size={12} className="text-blue-500 fill-blue-50" />
                           </button>
                           <button
                             onClick={(e) => handleDeleteManagerClick(mgr.id, e)}
                             className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-md cursor-pointer"
                             title="Delete Manager"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={12} className="text-red-500 fill-red-50" />
                           </button>
                         </div>
                       </div>
 
                       <div className="space-y-1 text-xs text-gray-500 font-mono">
                         <div className="flex items-center gap-1.5">
-                          <Phone size={11} className="text-gray-400" />
+                          <Phone size={11} className="text-blue-500 fill-blue-50" />
                           <span>{mgr.phone}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <Mail size={11} className="text-gray-400 truncate" />
+                          <Mail size={11} className="text-indigo-500 fill-indigo-50 truncate" />
                           <span className="truncate">{mgr.email}</span>
                         </div>
                       </div>
@@ -831,7 +831,7 @@ export default function ExamRecordsModule({
                 onClick={handleAddExamClick}
                 className="px-4 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
               >
-                <Plus size={14} />
+                <Plus size={14} className="text-white font-bold" />
                 <span>Schedule Student</span>
               </button>
             </div>
@@ -841,7 +841,7 @@ export default function ExamRecordsModule({
           <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-5 space-y-3 shadow-3xs">
             <div className="flex items-center justify-between border-b border-amber-200/50 pb-2.5">
               <div className="flex items-center gap-2">
-                <Bell className="text-amber-600 animate-swing" size={18} />
+                <Bell className="text-amber-500 fill-amber-100 animate-swing" size={18} />
                 <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
                   AIOU Dynamic Exam Notification Reminders
                 </h4>
@@ -1306,12 +1306,12 @@ export default function ExamRecordsModule({
 
                         <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
                           <div className="flex items-center gap-1">
-                            <Phone size={12} className="text-gray-400" />
+                            <Phone size={12} className="text-blue-500 fill-blue-50" />
                             <span>{info.contactNumber}</span>
                           </div>
                           <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3">
                             <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-gray-700">
-                              <BookOpen size={12} className="text-purple-600" />
+                              <BookOpen size={12} className="text-purple-500 fill-purple-100 font-bold" />
                               <span>Papers Scheduled:</span>
                             </div>
                             <div className="flex flex-wrap gap-2">

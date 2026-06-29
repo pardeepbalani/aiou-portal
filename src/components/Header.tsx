@@ -40,7 +40,7 @@ export default function Header({
                   : 'bg-white border-sky-200 text-sky-700 hover:bg-sky-100'
               }`}
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft size={16} className="text-emerald-600 font-bold" />
               <span>Back</span>
             </button>
           )}
@@ -95,7 +95,7 @@ export default function Header({
                 }`}
                 title="Logout"
               >
-                <LogOut size={16} />
+                <LogOut size={16} className="text-rose-500 hover:text-rose-600 font-bold" />
               </button>
             </div>
           )}
