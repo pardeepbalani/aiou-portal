@@ -21,14 +21,17 @@ import {
   TrendingUp,
   CreditCard,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { 
   StudentRecord, 
   ExamManager, 
   StudentExamInfo, 
   CourseExamDate, 
-  ExamPaymentHistory 
+  ExamPaymentHistory,
+  StudentExamSemester
 } from '../types';
 import { 
   saveExamManager, 
@@ -69,6 +72,13 @@ export default function ExamRecordsModule({
   const [isExamFormOpen, setIsExamFormOpen] = useState<boolean>(false);
   const [editingExamInfo, setEditingExamInfo] = useState<StudentExamInfo | null>(null);
 
+  // Multi-semester state management
+  const [formSemesters, setFormSemesters] = useState<StudentExamSemester[]>([]);
+  const [activeFormSemId, setActiveFormSemId] = useState<string>('');
+  const [newSemSeason, setNewSemSeason] = useState<'Autumn' | 'Spring'>('Autumn');
+  const [newSemYear, setNewSemYear] = useState<string>('2026');
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+
   // Manager Form fields
   const [mgrName, setMgrName] = useState('');
   const [mgrPhone, setMgrPhone] = useState('');
@@ -96,6 +106,94 @@ export default function ExamRecordsModule({
   // Toast simulations
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Direct helper to update a single semester's records inside the multi-semester form
+  const updateSemester = (semId: string, fields: Partial<StudentExamSemester>) => {
+    setFormSemesters(prev => prev.map(s => {
+      if (s.id === semId) {
+        return { ...s, ...fields };
+      }
+      return s;
+    }));
+  };
+
+  // Helper to switch the active semester tab in the form
+  const selectSemester = (semId: string) => {
+    const activeSem = formSemesters.find(s => s.id === semId);
+    if (activeSem) {
+      setActiveFormSemId(semId);
+      setExamCourseCodes(activeSem.courseCodes || []);
+      setExamDatesList(activeSem.examDates || []);
+      setTotalFee(activeSem.totalFee || 0);
+      setAmountReceived(activeSem.amountReceived || 0);
+      setPaymentHistory(activeSem.paymentHistory || []);
+      
+      const parts = (activeSem.semesterTerm || 'Autumn 2026').split(' ');
+      setSemesterSeason(parts[0] === 'Spring' ? 'Spring' : 'Autumn');
+      setSemesterYear(parts[1] || '2026');
+      setExamSemesterTerm(activeSem.semesterTerm || 'Autumn 2026');
+    }
+  };
+
+  // Toggle student detail expansion row
+  const handleToggleExpandStudent = (id: string) => {
+    setExpandedStudentId(expandedStudentId === id ? null : id);
+  };
+
+  // Safe normalization of exam records
+  const setNormalizedExamRecords = (records: StudentExamInfo[]) => {
+    const normalized = records.map(rec => {
+      if (!rec.semesters || rec.semesters.length === 0) {
+        const legacySem: StudentExamSemester = {
+          id: `sem-legacy-${Math.random().toString(36).substr(2, 9)}`,
+          semesterTerm: rec.semesterTerm || 'Autumn 2026',
+          courseCodes: rec.courseCodes || (rec.courseCode ? [rec.courseCode] : []),
+          examDates: rec.examDates || [],
+          totalFee: rec.totalFee || 0,
+          amountReceived: rec.amountReceived || 0,
+          paymentHistory: rec.paymentHistory || []
+        };
+        return {
+          ...rec,
+          semesters: [legacySem]
+        };
+      }
+      return rec;
+    });
+    setExamRecords(normalized);
+  };
+
+  // Create a new semester tab inside the editing form
+  const handleCreateSemesterTab = () => {
+    const termStr = `${newSemSeason} ${newSemYear}`;
+    const exists = formSemesters.some(s => s.semesterTerm === termStr);
+    if (exists) {
+      triggerToast(`Semester ${termStr} is already registered.`);
+      return;
+    }
+    const newSem: StudentExamSemester = {
+      id: `sem-${Math.random().toString(36).substr(2, 9)}`,
+      semesterTerm: termStr,
+      courseCodes: [],
+      examDates: [],
+      totalFee: 2500,
+      amountReceived: 0,
+      paymentHistory: []
+    };
+    const updatedSems = [...formSemesters, newSem];
+    setFormSemesters(updatedSems);
+    setActiveFormSemId(newSem.id);
+
+    // Sync input fields
+    setExamCourseCodes([]);
+    setExamDatesList([]);
+    setTotalFee(2500);
+    setAmountReceived(0);
+    setPaymentHistory([]);
+    setNewPayAmount('');
+
+    triggerToast(`Added new semester tab for ${termStr}!`);
+  };
+
   // Load managers and exam records on mount and sync
   const loadExamData = async () => {
     setLoading(true);
@@ -103,7 +201,7 @@ export default function ExamRecordsModule({
       const syncedManagers = await fetchAndSyncExamManagers();
       const syncedExamRecords = await fetchAndSyncStudentExamInfos();
       setManagers(syncedManagers);
-      setExamRecords(syncedExamRecords);
+      setNormalizedExamRecords(syncedExamRecords);
     } catch (err) {
       console.error('Failed to sync Exam module tables:', err);
     } finally {
@@ -215,8 +313,29 @@ export default function ExamRecordsModule({
     setSemesterSeason('Autumn');
     setSemesterYear('2026');
     setExamSemesterTerm('Autumn 2026');
-    // Pre-populate with the currently selected course
+    
+    // Pre-populate with currently selected course
     const initialCourse = selectedCourse ? [selectedCourse] : [];
+    const initialSemId = `sem-${Math.random().toString(36).substr(2, 9)}`;
+    const initialSemesters: StudentExamSemester[] = [{
+      id: initialSemId,
+      semesterTerm: 'Autumn 2026',
+      courseCodes: initialCourse,
+      examDates: initialCourse.map(code => ({
+        courseCode: code,
+        examDate: '',
+        status: 'Pending',
+        reappearDate: '',
+        remarks: ''
+      })),
+      totalFee: 2500,
+      amountReceived: 0,
+      paymentHistory: []
+    }];
+
+    setFormSemesters(initialSemesters);
+    setActiveFormSemId(initialSemId);
+
     setExamCourseCodes(initialCourse);
     setExamDatesList(initialCourse.map(code => ({
       courseCode: code,
@@ -240,32 +359,38 @@ export default function ExamRecordsModule({
     setExamStudentId(info.studentId);
     setExamContactNumber(info.contactNumber);
     
-    // Parse semesterTerm
-    const term = info.semesterTerm || 'Autumn 2026';
-    const parts = term.split(' ');
+    // Normalize semesters list
+    let sems = info.semesters || [];
+    if (sems.length === 0) {
+      sems = [{
+        id: `sem-legacy-${Math.random().toString(36).substr(2, 9)}`,
+        semesterTerm: info.semesterTerm || 'Autumn 2026',
+        courseCodes: info.courseCodes || (info.courseCode ? [info.courseCode] : []),
+        examDates: info.examDates || [],
+        totalFee: info.totalFee || 0,
+        amountReceived: info.amountReceived || 0,
+        paymentHistory: info.paymentHistory || []
+      }];
+    }
+
+    setFormSemesters(sems);
+
+    // Set first semester as active
+    const firstSem = sems[0];
+    setActiveFormSemId(firstSem.id);
+
+    // Sync input fields
+    setExamCourseCodes(firstSem.courseCodes || []);
+    setExamDatesList(firstSem.examDates || []);
+    setTotalFee(firstSem.totalFee || 0);
+    setAmountReceived(firstSem.amountReceived || 0);
+    setPaymentHistory(firstSem.paymentHistory || []);
+
+    const parts = (firstSem.semesterTerm || 'Autumn 2026').split(' ');
     setSemesterSeason(parts[0] === 'Spring' ? 'Spring' : 'Autumn');
     setSemesterYear(parts[1] || '2026');
-    setExamSemesterTerm(term);
+    setExamSemesterTerm(firstSem.semesterTerm || 'Autumn 2026');
 
-    const codes = info.courseCodes || [info.courseCode];
-    setExamCourseCodes(codes);
-    
-    // Ensure all exam date attributes are preserved or defaulted
-    const dates = codes.map(code => {
-      const existingDate = info.examDates?.find(d => d.courseCode === code);
-      return {
-        courseCode: code,
-        examDate: existingDate?.examDate || '',
-        status: existingDate?.status || 'Pending',
-        reappearDate: existingDate?.reappearDate || '',
-        remarks: existingDate?.remarks || ''
-      };
-    });
-    setExamDatesList(dates);
-    
-    setTotalFee(info.totalFee);
-    setAmountReceived(info.amountReceived);
-    setPaymentHistory(info.paymentHistory || []);
     setNewPayAmount('');
     setIsExamFormOpen(true);
   };
@@ -276,7 +401,7 @@ export default function ExamRecordsModule({
       try {
         await deleteStudentExamInfo(id);
         const updated = await fetchAndSyncStudentExamInfos();
-        setExamRecords(updated);
+        setNormalizedExamRecords(updated);
         triggerToast('Exam registration deleted.');
       } catch (err) {
         console.error(err);
@@ -292,44 +417,81 @@ export default function ExamRecordsModule({
       triggerToast('Course code already added.');
       return;
     }
-    setExamCourseCodes([...examCourseCodes, code]);
-    setExamDatesList([...examDatesList, { 
+    const updatedCodes = [...examCourseCodes, code];
+    const updatedDates = [...examDatesList, { 
       courseCode: code, 
       examDate: '', 
       status: 'Pending', 
       reappearDate: '', 
       remarks: '' 
-    }]);
+    }];
+    const updatedFee = totalFee + 500;
+
+    setExamCourseCodes(updatedCodes);
+    setExamDatesList(updatedDates);
+    setTotalFee(updatedFee);
     setNewCourseCodeInput('');
-    // Automatically adjust paper fee (e.g. Rs 500 per additional paper)
-    setTotalFee(prev => prev + 500);
+
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, {
+        courseCodes: updatedCodes,
+        examDates: updatedDates,
+        totalFee: updatedFee
+      });
+    }
   };
 
   // Remove course code from list in form
   const handleRemoveCourseCodeFromExam = (code: string) => {
-    setExamCourseCodes(examCourseCodes.filter(c => c !== code));
-    setExamDatesList(examDatesList.filter(d => d.courseCode !== code));
-    setTotalFee(prev => Math.max(1000, prev - 500));
+    const updatedCodes = examCourseCodes.filter(c => c !== code);
+    const updatedDates = examDatesList.filter(d => d.courseCode !== code);
+    const updatedFee = Math.max(1000, totalFee - 500);
+
+    setExamCourseCodes(updatedCodes);
+    setExamDatesList(updatedDates);
+    setTotalFee(updatedFee);
+
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, {
+        courseCodes: updatedCodes,
+        examDates: updatedDates,
+        totalFee: updatedFee
+      });
+    }
   };
 
   // Update specific exam date in form list
   const handleUpdateExamDate = (code: string, dateVal: string) => {
-    setExamDatesList(examDatesList.map(item => {
+    const updatedDates = examDatesList.map(item => {
       if (item.courseCode === code) {
         return { ...item, examDate: dateVal };
       }
       return item;
-    }));
+    });
+    setExamDatesList(updatedDates);
+
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, {
+        examDates: updatedDates
+      });
+    }
   };
 
   // Update specific course exam field in form list
   const handleUpdateCourseExamField = (code: string, field: keyof CourseExamDate, value: any) => {
-    setExamDatesList(examDatesList.map(item => {
+    const updatedDates = examDatesList.map(item => {
       if (item.courseCode === code) {
         return { ...item, [field]: value };
       }
       return item;
-    }));
+    });
+    setExamDatesList(updatedDates);
+
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, {
+        examDates: updatedDates
+      });
+    }
   };
 
   // Add transaction to local payment history in form
@@ -351,16 +513,36 @@ export default function ExamRecordsModule({
       amount: amt
     };
 
-    setPaymentHistory([...paymentHistory, newPayment]);
-    setAmountReceived(prev => prev + amt);
+    const updatedHistory = [...paymentHistory, newPayment];
+    const updatedReceived = amountReceived + amt;
+
+    setPaymentHistory(updatedHistory);
+    setAmountReceived(updatedReceived);
     setNewPayAmount('');
     triggerToast(`Payment transaction of Rs. ${amt.toLocaleString()} recorded.`);
+
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, {
+        paymentHistory: updatedHistory,
+        amountReceived: updatedReceived
+      });
+    }
   };
 
   // Remove payment transaction
   const handleRemovePaymentTransaction = (payId: string, amount: number) => {
-    setPaymentHistory(paymentHistory.filter(p => p.id !== payId));
-    setAmountReceived(prev => Math.max(0, prev - amount));
+    const updatedHistory = paymentHistory.filter(p => p.id !== payId);
+    const updatedReceived = Math.max(0, amountReceived - amount);
+
+    setPaymentHistory(updatedHistory);
+    setAmountReceived(updatedReceived);
+
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, {
+        paymentHistory: updatedHistory,
+        amountReceived: updatedReceived
+      });
+    }
   };
 
   // Handle prefilling student details from existing Directory Records
@@ -376,20 +558,42 @@ export default function ExamRecordsModule({
       
       // Auto pre-populate courses from their active semester if available
       const firstSem = student.semesters?.[0];
-      if (firstSem && firstSem.courses?.length > 0) {
-        const codes = firstSem.courses.map(c => c.code).filter(Boolean);
-        if (codes.length > 0) {
-          setExamCourseCodes(codes);
-          setExamDatesList(codes.map(code => ({ 
-            courseCode: code, 
-            examDate: '',
-            status: 'Pending',
-            reappearDate: '',
-            remarks: ''
-          })));
-          setTotalFee(1000 + (codes.length * 500)); // Dynamic fee base
-        }
-      }
+      const codes = firstSem?.courses?.map(c => c.code).filter(Boolean) || [];
+      const initialSemId = `sem-${Math.random().toString(36).substr(2, 9)}`;
+      const semTermStr = student.semesterType && student.admissionYear ? `${student.semesterType} ${student.admissionYear}` : 'Autumn 2026';
+      
+      const newSem: StudentExamSemester = {
+        id: initialSemId,
+        semesterTerm: semTermStr,
+        courseCodes: codes,
+        examDates: codes.map(code => ({ 
+          courseCode: code, 
+          examDate: '',
+          status: 'Pending',
+          reappearDate: '',
+          remarks: ''
+        })),
+        totalFee: 1000 + (codes.length * 500),
+        amountReceived: 0,
+        paymentHistory: []
+      };
+
+      setFormSemesters([newSem]);
+      setActiveFormSemId(initialSemId);
+
+      setExamCourseCodes(codes);
+      setExamDatesList(codes.map(code => ({ 
+        courseCode: code, 
+        examDate: '',
+        status: 'Pending',
+        reappearDate: '',
+        remarks: ''
+      })));
+      setTotalFee(1000 + (codes.length * 500));
+      setAmountReceived(0);
+      setPaymentHistory([]);
+      setNewPayAmount('');
+
       triggerToast(`Prefilled details for ${student.studentName}!`);
     }
   };
@@ -402,30 +606,42 @@ export default function ExamRecordsModule({
       triggerToast('Please fill all required student identifiers.');
       return;
     }
-    if (examCourseCodes.length === 0) {
-      triggerToast('Add at least one Course Code for this exam.');
+    if (formSemesters.length === 0) {
+      triggerToast('Please register at least one semester for this student.');
       return;
     }
 
-    const computedSemesterTerm = `${semesterSeason} ${semesterYear}`;
+    // Validate that each semester has at least one course code
+    const invalidSem = formSemesters.find(s => s.courseCodes.length === 0);
+    if (invalidSem) {
+      triggerToast(`Semester "${invalidSem.semesterTerm}" must have at least one course code.`);
+      return;
+    }
+
+    // Keep active or first semester's values as top-level properties for legacy compatibility
+    const activeSem = formSemesters.find(s => s.id === activeFormSemId) || formSemesters[0];
 
     const examObj: StudentExamInfo = {
       id: editingExamInfo ? editingExamInfo.id : `exam-${Math.random().toString(36).substr(2, 9)}`,
       centre: selectedCentre,
       managerId: selectedManager.id,
-      courseCode: examCourseCodes[0] || '',
+      courseCode: activeSem.courseCodes[0] || '',
       studentName: examStudentName.trim(),
       fatherName: examFatherName.trim(),
       studentId: examStudentId.trim(),
       contactNumber: examContactNumber.trim(),
-      semesterTerm: computedSemesterTerm,
-      courseCodes: examCourseCodes,
-      examDates: examDatesList,
       
-      totalFee: totalFee,
-      amountReceived: amountReceived,
-      remainingBalance: Math.max(0, totalFee - amountReceived),
-      paymentHistory: paymentHistory,
+      // Multiple semesters support
+      semesters: formSemesters,
+
+      // Legacy fallback support fields
+      semesterTerm: activeSem.semesterTerm,
+      courseCodes: activeSem.courseCodes,
+      examDates: activeSem.examDates,
+      totalFee: activeSem.totalFee,
+      amountReceived: activeSem.amountReceived,
+      remainingBalance: Math.max(0, activeSem.totalFee - activeSem.amountReceived),
+      paymentHistory: activeSem.paymentHistory,
 
       createdAt: editingExamInfo ? editingExamInfo.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -434,7 +650,7 @@ export default function ExamRecordsModule({
     try {
       await saveStudentExamInfo(examObj);
       const updated = await fetchAndSyncStudentExamInfos();
-      setExamRecords(updated);
+      setNormalizedExamRecords(updated);
       setIsExamFormOpen(false);
       setEditingExamInfo(null);
       triggerToast(editingExamInfo ? 'Examination record updated!' : 'New examination record created successfully!');

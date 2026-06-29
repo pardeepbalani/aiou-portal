@@ -99,6 +99,16 @@ export interface CourseExamDate {
   remarks?: string;
 }
 
+export interface StudentExamSemester {
+  id: string;
+  semesterTerm: string;
+  courseCodes: string[];
+  examDates: CourseExamDate[];
+  totalFee: number;
+  amountReceived: number;
+  paymentHistory: ExamPaymentHistory[];
+}
+
 export interface StudentExamInfo {
   id: string;
   centre: 'Mithi' | 'Diplo';
@@ -108,15 +118,18 @@ export interface StudentExamInfo {
   fatherName: string;
   studentId: string;
   contactNumber: string;
-  semesterTerm: string;
-  courseCodes: string[];
-  examDates: CourseExamDate[];
   
-  // Payment Management Section
-  totalFee: number;
-  amountReceived: number;
-  remainingBalance: number;
-  paymentHistory: ExamPaymentHistory[];
+  // Multiple semesters support
+  semesters?: StudentExamSemester[];
+
+  // Fallbacks/Legacy fields
+  semesterTerm?: string;
+  courseCodes?: string[];
+  examDates?: CourseExamDate[];
+  totalFee?: number;
+  amountReceived?: number;
+  remainingBalance?: number;
+  paymentHistory?: ExamPaymentHistory[];
 
   createdAt: string;
   updatedAt: string;
