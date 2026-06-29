@@ -397,7 +397,7 @@ export default function ExamRecordsModule({
   // Save student exam record
   const handleSaveStudentExam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCentre || !selectedManager || !selectedCourse) return;
+    if (!selectedCentre || !selectedManager) return;
     if (!examStudentName.trim() || !examFatherName.trim() || !examStudentId.trim() || !examContactNumber.trim()) {
       triggerToast('Please fill all required student identifiers.');
       return;
@@ -413,7 +413,7 @@ export default function ExamRecordsModule({
       id: editingExamInfo ? editingExamInfo.id : `exam-${Math.random().toString(36).substr(2, 9)}`,
       centre: selectedCentre,
       managerId: selectedManager.id,
-      courseCode: selectedCourse,
+      courseCode: examCourseCodes[0] || '',
       studentName: examStudentName.trim(),
       fatherName: examFatherName.trim(),
       studentId: examStudentId.trim(),
@@ -507,8 +507,7 @@ export default function ExamRecordsModule({
         <div className="flex items-center gap-3">
           <button 
             onClick={() => {
-              if (step === 'student_exam') setStep('courses');
-              else if (step === 'courses') setStep('manager');
+              if (step === 'student_exam') setStep('manager');
               else if (step === 'manager') setStep('centre');
               else onBackToDashboard();
             }}
@@ -739,7 +738,7 @@ export default function ExamRecordsModule({
                     key={mgr.id}
                     onClick={() => {
                       setSelectedManager(mgr);
-                      setStep('courses');
+                      setStep('student_exam');
                     }}
                     className="p-5 bg-white border border-gray-150 rounded-2xl hover:border-purple-300 hover:shadow-xs cursor-pointer transition-all duration-150 flex flex-col justify-between group"
                   >
@@ -805,28 +804,35 @@ export default function ExamRecordsModule({
         </div>
       )}
 
-      {/* STEP 3: COURSE SELECTION & NOTIFICATION DASHBOARD */}
-      {step === 'courses' && (
+      {/* STEP 4: COURSE CHOSEN -> REGISTRATIONS LIST & FORM */}
+      {step === 'student_exam' && selectedManager && (
         <div className="space-y-6">
           
-          {/* Header context card */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-150 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          {/* Header contextual breadcrumb */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <span className="text-[9px] font-black uppercase text-purple-600 font-mono tracking-wider">Exam Control parameters</span>
+              <span className="text-[9px] font-black uppercase text-purple-600 font-mono tracking-wider font-extrabold">Exam Hub Manager Console</span>
               <h3 className="text-base font-extrabold text-gray-900">
-                Centre: {selectedCentre} • Manager: {selectedManager?.name}
+                Student Examination & Date Sheets
               </h3>
               <p className="text-xs text-gray-400">
-                Manage the schedule and registrations for exam courses. Select a course code below to register exam roll numbers.
+                Assigned Manager: <strong>{selectedManager.name}</strong> • Centre: <strong>{selectedCentre} Centre</strong>
               </p>
             </div>
-            
+
             <div className="flex gap-2">
               <button
                 onClick={() => setStep('manager')}
-                className="px-3.5 py-1.5 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 rounded-xl cursor-pointer"
               >
-                Change Manager
+                Back to Managers
+              </button>
+              <button
+                onClick={handleAddExamClick}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Plus size={14} />
+                <span>Schedule Student</span>
               </button>
             </div>
           </div>
@@ -889,89 +895,6 @@ export default function ExamRecordsModule({
                 })}
               </div>
             )}
-          </div>
-
-          {/* Courses Grid */}
-          <div className="space-y-4">
-            <h4 className="text-xs font-black uppercase text-gray-400 tracking-wide">
-              Course Listing (From Enrolled Directory)
-            </h4>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {allAvailableCourses.map((courseCode) => {
-                const courseCount = examRecords.filter(r => 
-                  r.centre === selectedCentre && 
-                  r.courseCode === courseCode &&
-                  (selectedManager ? r.managerId === selectedManager.id : true)
-                ).length;
-
-                return (
-                  <div
-                    key={courseCode}
-                    onClick={() => {
-                      setSelectedCourse(courseCode);
-                      setStep('student_exam');
-                    }}
-                    className="p-4 bg-white border border-gray-150 rounded-xl hover:border-purple-400 hover:shadow-xs cursor-pointer transition-all flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2.5 bg-purple-50 text-purple-700 rounded-lg group-hover:bg-purple-100 transition-colors">
-                        <BookOpen size={16} />
-                      </div>
-                      <div>
-                        <span className="block font-black text-gray-900 text-sm">
-                          Course {courseCode}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-bold">
-                          AIOU Curriculum
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                      courseCount > 0 ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {courseCount} Scheduled
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4: COURSE CHOSEN -> REGISTRATIONS LIST & FORM */}
-      {step === 'student_exam' && selectedCourse && selectedManager && (
-        <div className="space-y-6">
-          
-          {/* Header contextual breadcrumb */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <span className="text-[9px] font-black uppercase text-purple-600 font-mono tracking-wider">Exam schedules</span>
-              <h3 className="text-base font-extrabold text-gray-900">
-                Registrations for Course Code "{selectedCourse}"
-              </h3>
-              <p className="text-xs text-gray-400">
-                Assigned Manager: {selectedManager.name} ({selectedCentre} Centre)
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setStep('courses')}
-                className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 rounded-xl cursor-pointer"
-              >
-                Back to Courses
-              </button>
-              <button
-                onClick={handleAddExamClick}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-              >
-                <Plus size={14} />
-                <span>Schedule Student</span>
-              </button>
-            </div>
           </div>
 
           {/* Exam Registration Form Modal */}
@@ -1358,7 +1281,7 @@ export default function ExamRecordsModule({
 
             {filteredExamRecords.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 text-xs italic text-gray-400">
-                No students scheduled for course "{selectedCourse}" under Centre {selectedCentre} yet. Click "Schedule Student" to register exams.
+                No students scheduled under Centre {selectedCentre} yet. Click "Schedule Student" to register exams.
               </div>
             ) : (
               <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden divide-y divide-gray-150 shadow-3xs">
