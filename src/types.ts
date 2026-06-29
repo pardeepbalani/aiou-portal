@@ -94,6 +94,9 @@ export interface ExamPaymentHistory {
 export interface CourseExamDate {
   courseCode: string;
   examDate: string;
+  status?: 'Passed' | 'Failed' | 'Pending';
+  reappearDate?: string;
+  remarks?: string;
 }
 
 export interface StudentExamInfo {

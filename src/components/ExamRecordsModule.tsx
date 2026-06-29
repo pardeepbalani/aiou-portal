@@ -80,6 +80,8 @@ export default function ExamRecordsModule({
   const [examStudentId, setExamStudentId] = useState('');
   const [examContactNumber, setExamContactNumber] = useState('');
   const [examSemesterTerm, setExamSemesterTerm] = useState('Autumn 2026');
+  const [semesterSeason, setSemesterSeason] = useState<'Autumn' | 'Spring'>('Autumn');
+  const [semesterYear, setSemesterYear] = useState<string>('2026');
   const [examCourseCodes, setExamCourseCodes] = useState<string[]>([]);
   const [examDatesList, setExamDatesList] = useState<CourseExamDate[]>([]);
   const [newCourseCodeInput, setNewCourseCodeInput] = useState('');
@@ -210,11 +212,19 @@ export default function ExamRecordsModule({
     setExamFatherName('');
     setExamStudentId('');
     setExamContactNumber('');
+    setSemesterSeason('Autumn');
+    setSemesterYear('2026');
     setExamSemesterTerm('Autumn 2026');
     // Pre-populate with the currently selected course
     const initialCourse = selectedCourse ? [selectedCourse] : [];
     setExamCourseCodes(initialCourse);
-    setExamDatesList(initialCourse.map(code => ({ courseCode: code, examDate: '' })));
+    setExamDatesList(initialCourse.map(code => ({
+      courseCode: code,
+      examDate: '',
+      status: 'Pending',
+      reappearDate: '',
+      remarks: ''
+    })));
     setTotalFee(2500); // Standard paper fee
     setAmountReceived(0);
     setPaymentHistory([]);
@@ -229,9 +239,30 @@ export default function ExamRecordsModule({
     setExamFatherName(info.fatherName);
     setExamStudentId(info.studentId);
     setExamContactNumber(info.contactNumber);
-    setExamSemesterTerm(info.semesterTerm);
-    setExamCourseCodes(info.courseCodes || [info.courseCode]);
-    setExamDatesList(info.examDates || [{ courseCode: info.courseCode, examDate: '' }]);
+    
+    // Parse semesterTerm
+    const term = info.semesterTerm || 'Autumn 2026';
+    const parts = term.split(' ');
+    setSemesterSeason(parts[0] === 'Spring' ? 'Spring' : 'Autumn');
+    setSemesterYear(parts[1] || '2026');
+    setExamSemesterTerm(term);
+
+    const codes = info.courseCodes || [info.courseCode];
+    setExamCourseCodes(codes);
+    
+    // Ensure all exam date attributes are preserved or defaulted
+    const dates = codes.map(code => {
+      const existingDate = info.examDates?.find(d => d.courseCode === code);
+      return {
+        courseCode: code,
+        examDate: existingDate?.examDate || '',
+        status: existingDate?.status || 'Pending',
+        reappearDate: existingDate?.reappearDate || '',
+        remarks: existingDate?.remarks || ''
+      };
+    });
+    setExamDatesList(dates);
+    
     setTotalFee(info.totalFee);
     setAmountReceived(info.amountReceived);
     setPaymentHistory(info.paymentHistory || []);
@@ -262,7 +293,13 @@ export default function ExamRecordsModule({
       return;
     }
     setExamCourseCodes([...examCourseCodes, code]);
-    setExamDatesList([...examDatesList, { courseCode: code, examDate: '' }]);
+    setExamDatesList([...examDatesList, { 
+      courseCode: code, 
+      examDate: '', 
+      status: 'Pending', 
+      reappearDate: '', 
+      remarks: '' 
+    }]);
     setNewCourseCodeInput('');
     // Automatically adjust paper fee (e.g. Rs 500 per additional paper)
     setTotalFee(prev => prev + 500);
@@ -280,6 +317,16 @@ export default function ExamRecordsModule({
     setExamDatesList(examDatesList.map(item => {
       if (item.courseCode === code) {
         return { ...item, examDate: dateVal };
+      }
+      return item;
+    }));
+  };
+
+  // Update specific course exam field in form list
+  const handleUpdateCourseExamField = (code: string, field: keyof CourseExamDate, value: any) => {
+    setExamDatesList(examDatesList.map(item => {
+      if (item.courseCode === code) {
+        return { ...item, [field]: value };
       }
       return item;
     }));
@@ -333,7 +380,13 @@ export default function ExamRecordsModule({
         const codes = firstSem.courses.map(c => c.code).filter(Boolean);
         if (codes.length > 0) {
           setExamCourseCodes(codes);
-          setExamDatesList(codes.map(code => ({ courseCode: code, examDate: '' })));
+          setExamDatesList(codes.map(code => ({ 
+            courseCode: code, 
+            examDate: '',
+            status: 'Pending',
+            reappearDate: '',
+            remarks: ''
+          })));
           setTotalFee(1000 + (codes.length * 500)); // Dynamic fee base
         }
       }
@@ -354,6 +407,8 @@ export default function ExamRecordsModule({
       return;
     }
 
+    const computedSemesterTerm = `${semesterSeason} ${semesterYear}`;
+
     const examObj: StudentExamInfo = {
       id: editingExamInfo ? editingExamInfo.id : `exam-${Math.random().toString(36).substr(2, 9)}`,
       centre: selectedCentre,
@@ -363,7 +418,7 @@ export default function ExamRecordsModule({
       fatherName: examFatherName.trim(),
       studentId: examStudentId.trim(),
       contactNumber: examContactNumber.trim(),
-      semesterTerm: examSemesterTerm,
+      semesterTerm: computedSemesterTerm,
       courseCodes: examCourseCodes,
       examDates: examDatesList,
       
@@ -1013,20 +1068,36 @@ export default function ExamRecordsModule({
 
                 {/* Section 2: Examination & Course Schedules */}
                 <div className="space-y-4 pt-4 border-t border-gray-50">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
                       Academic Examination & Course Scheduling
                     </h5>
                     
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">Semester / Term:</span>
-                      <input 
-                        type="text"
-                        value={examSemesterTerm}
-                        onChange={(e) => setExamSemesterTerm(e.target.value)}
-                        placeholder="e.g. Autumn 2026"
-                        className="text-xs px-2 py-1 border rounded-lg max-w-[120px] focus:outline-hidden font-bold"
-                      />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Semester:</span>
+                        <select
+                          value={semesterSeason}
+                          onChange={(e) => setSemesterSeason(e.target.value as 'Autumn' | 'Spring')}
+                          className="text-xs px-2.5 py-1 border border-purple-100 rounded-lg bg-white text-purple-900 font-bold focus:outline-hidden"
+                        >
+                          <option value="Autumn">Autumn</option>
+                          <option value="Spring">Spring</option>
+                        </select>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Year:</span>
+                        <select
+                          value={semesterYear}
+                          onChange={(e) => setSemesterYear(e.target.value)}
+                          className="text-xs px-2.5 py-1 border border-purple-100 rounded-lg bg-white text-purple-900 font-bold font-mono focus:outline-hidden"
+                        >
+                          {['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'].map(yr => (
+                            <option key={yr} value={yr}>{yr}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1076,25 +1147,85 @@ export default function ExamRecordsModule({
                     {/* Paper Exam Dates Scheduler */}
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
                       <span className="block text-[10px] font-extrabold uppercase text-gray-500">
-                        Set Exam Date for each Course Code
+                        Set Exam Date & Results for each Course Code
                       </span>
 
                       {examCourseCodes.length === 0 ? (
                         <p className="text-xs text-gray-400 italic">Add course codes first to schedule exam dates.</p>
                       ) : (
-                        <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                           {examCourseCodes.map(code => {
-                            const foundDate = examDatesList.find(d => d.courseCode === code)?.examDate || '';
+                            const foundItem = examDatesList.find(d => d.courseCode === code);
+                            const examDateVal = foundItem?.examDate || '';
+                            const statusVal = foundItem?.status || 'Pending';
+                            const reappearDateVal = foundItem?.reappearDate || '';
+                            const remarksVal = foundItem?.remarks || '';
                             return (
-                              <div key={code} className="flex items-center justify-between gap-3 text-xs">
-                                <span className="font-bold text-gray-700 font-mono">Course {code}:</span>
-                                <input
-                                  type="date"
-                                  required
-                                  value={foundDate}
-                                  onChange={(e) => handleUpdateExamDate(code, e.target.value)}
-                                  className="px-2 py-1 border rounded-lg text-xs bg-white focus:outline-hidden"
-                                />
+                              <div key={code} className="p-3 bg-white border border-gray-150 rounded-xl space-y-2.5 shadow-3xs">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-extrabold text-gray-800 font-mono text-xs">Course {code}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCourseCodeFromExam(code)}
+                                    className="text-red-500 hover:text-red-700 text-xs font-bold"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Exam Date</label>
+                                    <input
+                                      type="date"
+                                      required
+                                      value={examDateVal}
+                                      onChange={(e) => handleUpdateCourseExamField(code, 'examDate', e.target.value)}
+                                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-hidden font-mono"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Paper Status</label>
+                                    <select
+                                      value={statusVal}
+                                      onChange={(e) => handleUpdateCourseExamField(code, 'status', e.target.value as any)}
+                                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-hidden font-bold text-gray-800"
+                                    >
+                                      <option value="Pending">Pending</option>
+                                      <option value="Passed">Passed</option>
+                                      <option value="Failed">Failed</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {statusVal === 'Failed' && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="space-y-1"
+                                  >
+                                    <label className="block text-[9px] font-bold text-red-500 uppercase">Reappear Date</label>
+                                    <input
+                                      type="date"
+                                      required
+                                      value={reappearDateVal}
+                                      onChange={(e) => handleUpdateCourseExamField(code, 'reappearDate', e.target.value)}
+                                      className="w-full px-2 py-1 border border-red-200 rounded-lg text-xs bg-red-50/20 focus:outline-hidden text-red-700 font-mono"
+                                    />
+                                  </motion.div>
+                                )}
+
+                                <div>
+                                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Paper Remarks</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. 1st Attempt, Reappear, etc."
+                                    value={remarksVal}
+                                    onChange={(e) => handleUpdateCourseExamField(code, 'remarks', e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-hidden"
+                                  />
+                                </div>
                               </div>
                             );
                           })}
@@ -1255,20 +1386,46 @@ export default function ExamRecordsModule({
                             <Phone size={12} className="text-gray-400" />
                             <span>{info.contactNumber}</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <BookOpen size={12} className="text-purple-600" />
-                            <span className="font-semibold text-gray-700">Papers:</span>
-                            <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3">
+                            <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-gray-700">
+                              <BookOpen size={12} className="text-purple-600" />
+                              <span>Papers Scheduled:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
                               {(info.courseCodes || [info.courseCode]).map(code => {
-                                const matchedDate = info.examDates?.find(d => d.courseCode === code)?.examDate || 'No Date';
+                                const matchedDateItem = info.examDates?.find(d => d.courseCode === code);
+                                const dateStr = matchedDateItem?.examDate || 'No Date';
+                                const status = matchedDateItem?.status || 'Pending';
+                                const reappear = matchedDateItem?.reappearDate;
+                                const rmk = matchedDateItem?.remarks;
+                                
+                                let statusBg = 'bg-gray-50 text-gray-700 border-gray-200';
+                                if (status === 'Passed') statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                if (status === 'Failed') statusBg = 'bg-red-50 text-red-700 border-red-200';
+
                                 return (
-                                  <span 
+                                  <div 
                                     key={code} 
-                                    className="text-[10px] font-mono font-bold bg-purple-50/50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100"
-                                    title={`Exam Date: ${matchedDate}`}
+                                    className={`flex flex-col gap-0.5 px-2.5 py-1.5 rounded-lg border text-[10px] ${statusBg}`}
                                   >
-                                    {code} ({matchedDate})
-                                  </span>
+                                    <div className="flex items-center gap-2 justify-between">
+                                      <span className="font-mono font-black">Course {code}</span>
+                                      <span className="font-black uppercase tracking-wider text-[8px]">{status}</span>
+                                    </div>
+                                    <div className="text-[9px] opacity-90 flex flex-col gap-0.5 pt-0.5 border-t border-dashed border-current/10">
+                                      <span>Exam: <span className="font-mono font-bold">{dateStr}</span></span>
+                                      {status === 'Failed' && reappear && (
+                                        <span className="text-red-600 font-bold">
+                                          Reappear: <span className="font-mono">{reappear}</span>
+                                        </span>
+                                      )}
+                                      {rmk && (
+                                        <span className="italic max-w-[150px] truncate">
+                                          Remarks: {rmk}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 );
                               })}
                             </div>
