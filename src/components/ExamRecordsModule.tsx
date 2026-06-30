@@ -194,6 +194,24 @@ export default function ExamRecordsModule({
     triggerToast(`Added new semester tab for ${termStr}!`);
   };
 
+  const handleSemesterSeasonChange = (season: 'Autumn' | 'Spring') => {
+    setSemesterSeason(season);
+    const newTerm = `${season} ${semesterYear}`;
+    setExamSemesterTerm(newTerm);
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, { semesterTerm: newTerm });
+    }
+  };
+
+  const handleSemesterYearChange = (year: string) => {
+    setSemesterYear(year);
+    const newTerm = `${semesterSeason} ${year}`;
+    setExamSemesterTerm(newTerm);
+    if (activeFormSemId) {
+      updateSemester(activeFormSemId, { semesterTerm: newTerm });
+    }
+  };
+
   // Load managers and exam records on mount and sync
   const loadExamData = async () => {
     setLoading(true);
@@ -1207,37 +1225,114 @@ export default function ExamRecordsModule({
 
                 {/* Section 2: Examination & Course Schedules */}
                 <div className="space-y-4 pt-4 border-t border-gray-50">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                      Academic Examination & Course Scheduling
-                    </h5>
-                    
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Semester:</span>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                        Academic Semesters for Examination
+                      </h5>
+
+                      <div className="flex flex-wrap items-center gap-2 p-2 bg-purple-50 rounded-xl border border-purple-100">
+                        <span className="text-[10px] font-black uppercase text-purple-800 px-1">New Term:</span>
                         <select
-                          value={semesterSeason}
-                          onChange={(e) => setSemesterSeason(e.target.value as 'Autumn' | 'Spring')}
-                          className="text-xs px-2.5 py-1 border border-purple-100 rounded-lg bg-white text-purple-900 font-bold focus:outline-hidden"
+                          value={newSemSeason}
+                          onChange={(e) => setNewSemSeason(e.target.value as 'Autumn' | 'Spring')}
+                          className="text-xs px-2 py-1 bg-white border border-purple-200 rounded-lg text-purple-900 font-bold focus:outline-hidden"
                         >
                           <option value="Autumn">Autumn</option>
                           <option value="Spring">Spring</option>
                         </select>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Year:</span>
                         <select
-                          value={semesterYear}
-                          onChange={(e) => setSemesterYear(e.target.value)}
-                          className="text-xs px-2.5 py-1 border border-purple-100 rounded-lg bg-white text-purple-900 font-bold font-mono focus:outline-hidden"
+                          value={newSemYear}
+                          onChange={(e) => setNewSemYear(e.target.value)}
+                          className="text-xs px-2 py-1 bg-white border border-purple-200 rounded-lg text-purple-900 font-bold font-mono focus:outline-hidden"
                         >
                           {['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'].map(yr => (
                             <option key={yr} value={yr}>{yr}</option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          onClick={handleCreateSemesterTab}
+                          className="px-3 py-1 bg-purple-600 hover:bg-purple-750 text-white text-xs font-bold rounded-lg cursor-pointer shadow-3xs flex items-center gap-1"
+                        >
+                          <Plus size={12} className="text-white font-bold" />
+                          <span>Add Semester Tab</span>
+                        </button>
                       </div>
                     </div>
+
+                    {/* Semesters list as tabs */}
+                    {formSemesters.length === 0 ? (
+                      <div className="p-4 text-center border border-dashed border-purple-200 rounded-xl text-xs text-purple-700 italic bg-purple-50/20">
+                        No semesters added. Please use the "Add Semester Tab" action above to create one.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 border-b border-gray-100 pb-2">
+                        {formSemesters.map((sem) => {
+                          const isActive = sem.id === activeFormSemId;
+                          return (
+                            <button
+                              key={sem.id}
+                              type="button"
+                              onClick={() => selectSemester(sem.id)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                                isActive
+                                  ? 'bg-purple-600 border-purple-600 text-white shadow-xs'
+                                  : 'bg-white border-gray-250 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {sem.semesterTerm}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Active semester metadata & settings */}
+                    {activeFormSemId && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/80 p-3 rounded-xl border border-gray-200">
+                        <div className="text-xs">
+                          <span className="text-gray-400 font-bold uppercase text-[9px]">Currently Configuring:</span>{' '}
+                          <span className="font-extrabold text-purple-900 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md font-mono">
+                            {formSemesters.find(s => s.id === activeFormSemId)?.semesterTerm}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Change Active Term name:</span>
+                          <select
+                            value={semesterSeason}
+                            onChange={(e) => handleSemesterSeasonChange(e.target.value as 'Autumn' | 'Spring')}
+                            className="text-xs px-2 py-1 border border-purple-200 rounded-lg bg-white text-purple-900 font-bold focus:outline-hidden"
+                          >
+                            <option value="Autumn">Autumn</option>
+                            <option value="Spring">Spring</option>
+                          </select>
+                          <select
+                            value={semesterYear}
+                            onChange={(e) => handleSemesterYearChange(e.target.value)}
+                            className="text-xs px-2 py-1 border border-purple-200 rounded-lg bg-white text-purple-900 font-bold font-mono focus:outline-hidden"
+                          >
+                            {['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'].map(yr => (
+                              <option key={yr} value={yr}>{yr}</option>
+                            ))}
+                          </select>
+                          {formSemesters.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const remaining = formSemesters.filter(s => s.id !== activeFormSemId);
+                                setFormSemesters(remaining);
+                                selectSemester(remaining[0].id);
+                                triggerToast('Semester tab deleted.');
+                              }}
+                              className="text-xs text-red-600 hover:text-red-850 font-bold ml-2 underline"
+                            >
+                              Delete Tab
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
@@ -1502,66 +1597,207 @@ export default function ExamRecordsModule({
             ) : (
               <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden divide-y divide-gray-150 shadow-3xs">
                 {filteredExamRecords.map((info) => {
-                  const sBalance = info.totalFee - info.amountReceived;
+                  const isExpanded = expandedStudentId === info.id;
+                  const semestersList = info.semesters || [];
+                  const activeSem = semestersList[0] || {
+                    id: 'sem-legacy',
+                    semesterTerm: info.semesterTerm || 'Autumn 2026',
+                    courseCodes: info.courseCodes || (info.courseCode ? [info.courseCode] : []),
+                    examDates: info.examDates || [],
+                    totalFee: info.totalFee || 0,
+                    amountReceived: info.amountReceived || 0,
+                    paymentHistory: info.paymentHistory || []
+                  };
+                  
+                  // Compute total combined outstanding balance
+                  const totalFeeSum = semestersList.length > 0 
+                    ? semestersList.reduce((acc, s) => acc + (s.totalFee || 0), 0)
+                    : (info.totalFee || 0);
+                  const totalReceivedSum = semestersList.length > 0
+                    ? semestersList.reduce((acc, s) => acc + (s.amountReceived || 0), 0)
+                    : (info.amountReceived || 0);
+                  const remainingBalanceCombined = totalFeeSum - totalReceivedSum;
+
                   return (
                     <div 
                       key={info.id}
-                      className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors"
+                      className="border-b border-gray-150 last:border-b-0 hover:bg-gray-50/20 transition-all"
                     >
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-extrabold text-sm text-gray-900">{info.studentName}</span>
-                          <span className="text-[10px] text-gray-400 font-bold">s/o {info.fatherName}</span>
-                          <span className="text-[10px] font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-gray-500">
-                            ID: {info.studentId}
-                          </span>
-                          <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
-                            {info.semesterTerm}
-                          </span>
+                      {/* Accordion Trigger Header */}
+                      <div 
+                        onClick={() => handleToggleExpandStudent(info.id)}
+                        className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
+                      >
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-gray-400 hover:text-purple-600 transition-colors mr-1">
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </span>
+                            <span className="font-extrabold text-sm text-gray-900">{info.studentName}</span>
+                            <span className="text-[10px] text-gray-400 font-bold">s/o {info.fatherName}</span>
+                            <span className="text-[10px] font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-gray-500">
+                              ID: {info.studentId}
+                            </span>
+                            
+                            {/* Semesters Badges */}
+                            <div className="flex flex-wrap gap-1">
+                              {semestersList.map(s => (
+                                <span key={s.id} className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
+                                  {s.semesterTerm}
+                                </span>
+                              ))}
+                              {semestersList.length === 0 && (
+                                <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
+                                  {info.semesterTerm}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Phone size={12} className="text-blue-500" />
+                              <span>{info.contactNumber}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+                              <BookOpen size={12} className="text-purple-500 font-bold" />
+                              <span>Registered Semesters: <span className="text-purple-700 font-extrabold">{Math.max(1, semestersList.length)}</span></span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <Phone size={12} className="text-blue-500 fill-blue-50" />
-                            <span>{info.contactNumber}</span>
+                        {/* Financial status and Actions */}
+                        <div className="flex items-center gap-4 justify-between md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0" onClick={(e) => e.stopPropagation()}>
+                          <div className="text-left md:text-right text-xs">
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Combined Fee Balance</span>
+                            <span className={`font-mono font-extrabold ${remainingBalanceCombined <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              {remainingBalanceCombined <= 0 
+                                ? `Fully Paid (Rs. ${totalReceivedSum.toLocaleString()})` 
+                                : `Rs. ${remainingBalanceCombined.toLocaleString()} Outstanding`
+                              }
+                            </span>
                           </div>
-                          <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3">
-                            <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-gray-700">
-                              <BookOpen size={12} className="text-purple-500 fill-purple-100 font-bold" />
-                              <span>Papers Scheduled:</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(info.courseCodes || [info.courseCode]).map(code => {
-                                const matchedDateItem = info.examDates?.find(d => d.courseCode === code);
-                                const dateStr = matchedDateItem?.examDate || 'No Date';
-                                const status = matchedDateItem?.status || 'Pending';
-                                const reappear = matchedDateItem?.reappearDate;
-                                const rmk = matchedDateItem?.remarks;
-                                
-                                let statusBg = 'bg-gray-50 text-gray-700 border-gray-200';
-                                if (status === 'Passed') statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                                if (status === 'Failed') statusBg = 'bg-red-50 text-red-700 border-red-200';
 
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditExamClick(info)}
+                              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-150 rounded-lg cursor-pointer transition-colors"
+                              title="Edit Record / Manage Semesters"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteExamClick(info.id)}
+                              className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-150 rounded-lg cursor-pointer transition-colors"
+                              title="Delete Record"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Section showing all detailed semesters data */}
+                      {isExpanded && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="bg-purple-50/20 px-5 pb-5 pt-1 border-t border-purple-100/30"
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between border-b border-purple-100/50 pb-2">
+                              <h5 className="text-[10px] font-black uppercase text-purple-600 tracking-wider">
+                                All Examination & Academic Semesters Logs
+                              </h5>
+                              <button
+                                onClick={() => handleEditExamClick(info)}
+                                className="text-[10px] font-black uppercase text-purple-700 hover:text-purple-900 bg-purple-50 border border-purple-200 px-2 py-1 rounded-md transition-all flex items-center gap-1 shadow-3xs cursor-pointer"
+                              >
+                                <Plus size={10} />
+                                <span>Add / Manage Semesters</span>
+                              </button>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              {/* If no semesters explicitly listed, fallback to single legacy list */}
+                              {(semestersList.length > 0 ? semestersList : [activeSem]).map((sem, sIdx) => {
+                                const outstanding = (sem.totalFee || 0) - (sem.amountReceived || 0);
                                 return (
-                                  <div 
-                                    key={code} 
-                                    className={`flex flex-col gap-0.5 px-2.5 py-1.5 rounded-lg border text-[10px] ${statusBg}`}
-                                  >
-                                    <div className="flex items-center gap-2 justify-between">
-                                      <span className="font-mono font-black">Course {code}</span>
-                                      <span className="font-black uppercase tracking-wider text-[8px]">{status}</span>
+                                  <div key={sem.id || sIdx} className="bg-white p-4 rounded-xl border border-gray-150 shadow-3xs space-y-3">
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                      <span className="font-extrabold text-xs text-purple-950 font-mono">
+                                        Semester: {sem.semesterTerm}
+                                      </span>
+                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase font-mono border ${
+                                        outstanding <= 0 
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                                      }`}>
+                                        {outstanding <= 0 ? 'PAID' : `DUE: Rs. ${outstanding.toLocaleString()}`}
+                                      </span>
                                     </div>
-                                    <div className="text-[9px] opacity-90 flex flex-col gap-0.5 pt-0.5 border-t border-dashed border-current/10">
-                                      <span>Exam: <span className="font-mono font-bold">{dateStr}</span></span>
-                                      {status === 'Failed' && reappear && (
-                                        <span className="text-red-600 font-bold">
-                                          Reappear: <span className="font-mono">{reappear}</span>
-                                        </span>
+
+                                    {/* Exam papers list */}
+                                    <div className="space-y-2">
+                                      <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider">
+                                        Papers & Exam Dates
+                                      </span>
+                                      
+                                      {(sem.courseCodes && sem.courseCodes.length > 0 ? sem.courseCodes : []).length === 0 ? (
+                                        <p className="text-[10px] text-gray-400 italic">No courses registered for this semester.</p>
+                                      ) : (
+                                        <div className="grid gap-2">
+                                          {sem.courseCodes?.map(code => {
+                                            const matchDate = sem.examDates?.find(d => d.courseCode === code);
+                                            const status = matchDate?.status || 'Pending';
+                                            const dateVal = matchDate?.examDate || 'Not Set';
+                                            const reappear = matchDate?.reappearDate;
+                                            const rmk = matchDate?.remarks;
+
+                                            let statStyle = 'bg-gray-50 text-gray-700 border-gray-150';
+                                            if (status === 'Passed') statStyle = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                                            if (status === 'Failed') statStyle = 'bg-red-50 text-red-700 border-red-100';
+
+                                            return (
+                                              <div key={code} className={`p-2 rounded-lg border text-[10px] ${statStyle} flex flex-col gap-0.5`}>
+                                                <div className="flex items-center justify-between font-bold">
+                                                  <span>Course {code}</span>
+                                                  <span className="text-[8px] font-black uppercase font-mono bg-white/70 px-1 py-0.2 rounded shadow-4xs border border-current/10">
+                                                    {status}
+                                                  </span>
+                                                </div>
+                                                <div className="text-[9px] opacity-90 font-medium">
+                                                  <div>Date: <span className="font-mono font-bold">{dateVal}</span></div>
+                                                  {status === 'Failed' && reappear && (
+                                                    <div className="text-red-600 font-bold">Reappear: <span className="font-mono">{reappear}</span></div>
+                                                  )}
+                                                  {rmk && <div className="italic text-gray-500">Remarks: {rmk}</div>}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       )}
-                                      {rmk && (
-                                        <span className="italic max-w-[150px] truncate">
-                                          Remarks: {rmk}
-                                        </span>
+                                    </div>
+
+                                    {/* Financial Breakdown & Logs */}
+                                    <div className="pt-2 border-t border-dashed border-gray-100 space-y-2">
+                                      <div className="flex justify-between items-center text-[10px] text-gray-500 font-bold">
+                                        <span>Fee: <span className="font-mono text-gray-800">Rs. {sem.totalFee?.toLocaleString()}</span></span>
+                                        <span>Paid: <span className="font-mono text-emerald-800">Rs. {sem.amountReceived?.toLocaleString()}</span></span>
+                                      </div>
+
+                                      {/* Nested transaction logs specific to this semester */}
+                                      {sem.paymentHistory && sem.paymentHistory.length > 0 && (
+                                        <div className="space-y-1 bg-gray-50 p-1.5 rounded-lg border border-gray-100 max-h-[100px] overflow-y-auto">
+                                          <span className="block text-[8px] font-bold text-gray-400 uppercase">Payment Logs</span>
+                                          {sem.paymentHistory.map(pay => (
+                                            <div key={pay.id} className="flex justify-between items-center text-[9px] text-gray-600 font-mono py-0.5 border-b border-gray-100/50 last:border-0">
+                                              <span>{pay.date}</span>
+                                              <span className="font-extrabold text-emerald-800">Rs. {pay.amount.toLocaleString()}</span>
+                                            </div>
+                                          ))}
+                                        </div>
                                       )}
                                     </div>
                                   </div>
@@ -1569,38 +1805,8 @@ export default function ExamRecordsModule({
                               })}
                             </div>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Financial status and Actions */}
-                      <div className="flex items-center gap-5 justify-between md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
-                        <div className="text-left md:text-right text-xs">
-                          <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Exam Fee status</span>
-                          <span className={`font-mono font-extrabold ${sBalance <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                            {sBalance <= 0 
-                              ? 'Fully Paid (Rs.' + info.amountReceived.toLocaleString() + ')' 
-                              : `Rs. ${sBalance.toLocaleString()} Outstanding`
-                            }
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleEditExamClick(info)}
-                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
-                            title="Edit Record"
-                          >
-                            <Edit size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteExamClick(info.id)}
-                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
-                            title="Delete Record"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
+                        </motion.div>
+                      )}
                     </div>
                   );
                 })}
