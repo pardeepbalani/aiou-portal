@@ -152,3 +152,32 @@ export const PROGRAM_OPTIONS = [
   'B.Com Admission',
   'Other BS Programs',
 ];
+
+export interface DegreePaymentHistory {
+  id: string;
+  date: string;
+  amount: number;
+  remarks?: string;
+}
+
+export interface StudentDegreeRecord {
+  id: string;
+  studentName: string;
+  fatherName: string;
+  studentId: string;
+  contactNumber: string;
+  courseName: string;
+  category: 'Normal' | 'Urgent';
+  appliedDate: string;
+  degreeReceivedDate?: string;
+  status: 'Applied' | 'Under Process' | 'Dispatched' | 'Received at Hub' | 'Delivered to Student';
+  totalFee: number;
+  amountReceived: number;
+  paymentHistory: DegreePaymentHistory[];
+  trackingNumber?: string;
+  verificationStatus: 'Pending' | 'Verified' | 'Rejected';
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

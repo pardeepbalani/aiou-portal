@@ -7,6 +7,7 @@ import EnrollmentForm from './components/EnrollmentForm';
 import StudentList from './components/StudentList';
 import StudentDetails from './components/StudentDetails';
 import ExamRecordsModule from './components/ExamRecordsModule';
+import DegreeMgtModule from './components/DegreeMgtModule';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
 import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords, isQuotaExceeded } from './firebase';
@@ -23,7 +24,7 @@ export default function App() {
     return (localStorage.getItem('aiou_theme') as 'green' | 'blue') || 'green';
   });
 
-  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records'>(() => {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records'>(() => {
     return isLoggedIn ? 'dashboard' : 'dashboard'; // Default to dashboard if logged in
   });
 
@@ -184,6 +185,8 @@ export default function App() {
       setCurrentView('dashboard');
     } else if (currentView === 'exam_records') {
       setCurrentView('dashboard');
+    } else if (currentView === 'degree_records') {
+      setCurrentView('dashboard');
     }
   };
 
@@ -293,6 +296,9 @@ export default function App() {
                 onSelectExamRecords={() => {
                   setCurrentView('exam_records');
                 }}
+                onSelectDegreeMgt={() => {
+                  setCurrentView('degree_records');
+                }}
                 theme={theme}
                 stats={statsSummary}
                 records={records}
@@ -358,6 +364,14 @@ export default function App() {
 
             {currentView === 'exam_records' && (
               <ExamRecordsModule
+                onBackToDashboard={() => setCurrentView('dashboard')}
+                studentRecords={records}
+                theme={theme}
+              />
+            )}
+
+            {currentView === 'degree_records' && (
+              <DegreeMgtModule
                 onBackToDashboard={() => setCurrentView('dashboard')}
                 studentRecords={records}
                 theme={theme}

@@ -11,7 +11,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord, ExamManager, StudentExamInfo } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -552,3 +552,104 @@ export async function deleteStudentExamInfo(id: string): Promise<void> {
     setQuotaExceeded(true);
   }
 }
+
+const DEGREE_RECORDS_COLLECTION = 'degree_records';
+const LOCAL_DEGREE_RECORDS_KEY = 'aiou_local_degree_records';
+
+export function getLocalDegreeRecords(): StudentDegreeRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_DEGREE_RECORDS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Failed to load local degree records:', error);
+    return [];
+  }
+}
+
+export function saveLocalDegreeRecords(records: StudentDegreeRecord[]): void {
+  try {
+    localStorage.setItem(LOCAL_DEGREE_RECORDS_KEY, JSON.stringify(records));
+  } catch (error) {
+    console.error('Failed to save local degree records:', error);
+  }
+}
+
+export async function saveStudentDegreeRecord(record: StudentDegreeRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  const local = getLocalDegreeRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalDegreeRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, DEGREE_RECORDS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.warn('Firestore write failed for Student Degree Record, using local fallback. Error:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeRecord[]> {
+  let remoteRecords: StudentDegreeRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, DEGREE_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        remoteRecords.push(data as StudentDegreeRecord);
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Student Degree Records. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalDegreeRecords();
+  }
+
+  const local = getLocalDegreeRecords();
+  const mergedMap = new Map<string, StudentDegreeRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalDegreeRecords(merged);
+  return merged;
+}
+
+export async function deleteStudentDegreeRecord(id: string): Promise<void> {
+  const local = getLocalDegreeRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalDegreeRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, DEGREE_RECORDS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.error('Firestore delete failed for Student Degree Record:', error);
+    setQuotaExceeded(true);
+  }
+}
+
