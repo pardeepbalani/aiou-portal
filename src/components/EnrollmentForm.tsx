@@ -58,6 +58,7 @@ export default function EnrollmentForm({
   const [admissionYear, setAdmissionYear] = useState(new Date().getFullYear().toString());
   const [semesterType, setSemesterType] = useState<'Autumn' | 'Spring'>('Autumn');
   const [status, setStatus] = useState<StudentStatus>('active');
+  const [programCategory, setProgramCategory] = useState('');
 
   // Academic Semesters State
   const [semesters, setSemesters] = useState<SemesterData[]>([]);
@@ -136,7 +137,15 @@ export default function EnrollmentForm({
       setServicePhysicalWorkshop(initialStudent.servicePhysicalWorkshop || false);
       setServiceResearchReport(initialStudent.serviceResearchReport || false);
       setStatus(initialStudent.status || 'active');
+      setProgramCategory(initialStudent.programCategory || '');
     } else {
+      if (programName.includes('Matriculation')) {
+        setProgramCategory('Science');
+      } else if (programName.includes('Intermediate')) {
+        setProgramCategory('Pre-medical');
+      } else {
+        setProgramCategory('');
+      }
       // Create empty semesters structure
       const emptySems: SemesterData[] = [];
       for (let s = 1; s <= totalSemesters; s++) {
@@ -263,6 +272,7 @@ export default function EnrollmentForm({
       cmsPasswordId: cmsPasswordId.trim(),
       admissionYear: admissionYear.trim(),
       programSelected: programName,
+      programCategory: programCategory || undefined,
       semesterType,
       semesters,
       totalReceivable: computedTotalReceivable,
@@ -365,7 +375,7 @@ export default function EnrollmentForm({
             <h3 className="text-lg font-bold text-gray-800">A. Admission Details</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-5 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Admission Year *
@@ -391,6 +401,32 @@ export default function EnrollmentForm({
                 className="w-full px-3.5 py-2 border border-gray-200 rounded-lg text-sm bg-gray-100 text-gray-500 font-medium"
               />
             </div>
+
+            {(programName.includes('Matriculation') || programName.includes('Intermediate')) && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Category / Group *
+                </label>
+                <select
+                  required
+                  value={programCategory}
+                  onChange={(e) => setProgramCategory(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-semibold text-gray-800"
+                >
+                  {programName.includes('Matriculation') ? (
+                    <>
+                      <option value="Science">Science</option>
+                      <option value="General">General</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Pre-medical">Pre-medical</option>
+                      <option value="Pre-Engineering">Pre-Engineering</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">

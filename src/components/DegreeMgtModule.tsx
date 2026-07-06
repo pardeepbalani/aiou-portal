@@ -129,7 +129,7 @@ export default function DegreeMgtModule({
       setCustomStudentName(matched.studentName);
       setCustomFatherName(matched.fatherName);
       setCustomContact(matched.phoneNumber);
-      setCustomCourse(matched.programSelected);
+      setCustomCourse(matched.programSelected + (matched.programCategory ? ` (${matched.programCategory})` : ''));
     }
   };
 

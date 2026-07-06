@@ -48,6 +48,7 @@ export interface StudentRecord {
   // Admission Details
   admissionYear: string;
   programSelected: string;
+  programCategory?: string; // e.g. 'Science' | 'General' | 'Pre-medical' | 'Pre-Engineering'
   semesterType: 'Autumn' | 'Spring';
 
   // Academic Semesters (depends on program)
@@ -142,6 +143,8 @@ export const PROGRAM_SEMESTERS_MAP: Record<string, number> = {
   'B.A Admission': 4,
   'B.Com Admission': 4,
   'Other BS Programs': 8,
+  'Matriculation (2 Years)': 4,
+  'Intermediate (2 Years)': 4,
 };
 
 export const PROGRAM_OPTIONS = [
@@ -151,6 +154,8 @@ export const PROGRAM_OPTIONS = [
   'B.A Admission',
   'B.Com Admission',
   'Other BS Programs',
+  'Matriculation (2 Years)',
+  'Intermediate (2 Years)',
 ];
 
 export interface DegreePaymentHistory {

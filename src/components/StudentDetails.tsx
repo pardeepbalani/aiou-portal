@@ -667,7 +667,10 @@ export default function StudentDetails({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Program Selected:</span>
-                  <span className="font-semibold text-gray-800 truncate max-w-[110px]">{student.programSelected}</span>
+                  <span className="font-semibold text-gray-800 truncate max-w-[110px]" title={student.programSelected + (student.programCategory ? ` (${student.programCategory})` : '')}>
+                    {student.programSelected}
+                    {student.programCategory ? ` (${student.programCategory})` : ''}
+                  </span>
                 </div>
               </div>
 
@@ -767,7 +770,14 @@ export default function StudentDetails({
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400 font-medium">Degree Program:</span>
-                  <span className="font-bold text-gray-900">{student.programSelected}</span>
+                  <span className="font-bold text-gray-900">
+                    {student.programSelected}
+                    {student.programCategory && (
+                      <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded-sm font-bold bg-amber-50 text-amber-700 border border-amber-150 text-[10px]">
+                        {student.programCategory}
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

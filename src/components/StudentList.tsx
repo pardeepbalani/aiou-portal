@@ -470,7 +470,14 @@ export default function StudentList({
                       {/* Program & admission details */}
                       <td className="py-4 px-4">
                         <div className="text-xs">
-                          <span className="font-semibold text-gray-800 block">{r.programSelected}</span>
+                          <span className="font-semibold text-gray-800 block">
+                            {r.programSelected}
+                            {r.programCategory && (
+                              <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded-sm font-bold bg-amber-50 text-amber-700 border border-amber-150 text-[10px]">
+                                {r.programCategory}
+                              </span>
+                            )}
+                          </span>
                           <span className="text-gray-400 flex items-center gap-1 mt-0.5">
                             <Calendar size={10} className="text-indigo-500 fill-indigo-50" />
                             <span>{r.admissionYear} ({r.semesterType})</span>
