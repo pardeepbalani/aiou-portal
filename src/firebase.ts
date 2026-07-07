@@ -181,6 +181,29 @@ export function sanitizeStudentRecord(r: any): StudentRecord {
   };
 }
 
+const DELETED_IDS_PREFIX = 'aiou_deleted_ids_';
+
+export function getDeletedIds(collectionName: string): string[] {
+  try {
+    const data = localStorage.getItem(DELETED_IDS_PREFIX + collectionName);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function addDeletedId(collectionName: string, id: string) {
+  try {
+    const ids = getDeletedIds(collectionName);
+    if (!ids.includes(id)) {
+      ids.push(id);
+      localStorage.setItem(DELETED_IDS_PREFIX + collectionName, JSON.stringify(ids));
+    }
+  } catch (e) {
+    console.error('Failed to save deleted ID:', e);
+  }
+}
+
 /**
  * Get all records from local storage.
  */
@@ -188,7 +211,9 @@ export function getLocalRecords(): StudentRecord[] {
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEY);
     const parsed = data ? JSON.parse(data) : [];
-    return Array.isArray(parsed) ? parsed.map(sanitizeStudentRecord) : [];
+    const records = Array.isArray(parsed) ? parsed.map(sanitizeStudentRecord) : [];
+    const deletedIds = getDeletedIds(COLLECTION_NAME);
+    return records.filter(r => !deletedIds.includes(r.id));
   } catch (error) {
     console.error('Failed to load local records:', error);
     return [];
@@ -200,7 +225,9 @@ export function getLocalRecords(): StudentRecord[] {
  */
 export function saveLocalRecords(records: StudentRecord[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(records));
+    const deletedIds = getDeletedIds(COLLECTION_NAME);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.error('Failed to save local records:', error);
   }
@@ -258,6 +285,7 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
  * Fetch all records from Firestore and sync with Local Storage.
  */
 export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
+  const deletedIds = getDeletedIds(COLLECTION_NAME);
   let remoteRecords: StudentRecord[] = [];
   try {
     await ensureAuthenticated();
@@ -267,7 +295,12 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
-        remoteRecords.push(sanitizeStudentRecord(data));
+        const record = sanitizeStudentRecord(data);
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
       }
     });
   } catch (error) {
@@ -337,6 +370,9 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
  * Delete a student record.
  */
 export async function deleteStudentRecord(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(COLLECTION_NAME, id);
+
   // Delete locally
   const localRecords = getLocalRecords();
   const updated = localRecords.filter(r => r.id !== id);
@@ -362,7 +398,9 @@ const LOCAL_EXAM_RECORDS_KEY = 'aiou_local_exam_records';
 export function getLocalExamManagers(): ExamManager[] {
   try {
     const data = localStorage.getItem(LOCAL_EXAM_MANAGERS_KEY);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(EXAM_MANAGERS_COLLECTION);
+    return parsed.filter((m: any) => !deletedIds.includes(m.id));
   } catch (error) {
     console.error('Failed to load local exam managers:', error);
     return [];
@@ -371,7 +409,9 @@ export function getLocalExamManagers(): ExamManager[] {
 
 export function saveLocalExamManagers(managers: ExamManager[]) {
   try {
-    localStorage.setItem(LOCAL_EXAM_MANAGERS_KEY, JSON.stringify(managers));
+    const deletedIds = getDeletedIds(EXAM_MANAGERS_COLLECTION);
+    const filtered = managers.filter(m => !deletedIds.includes(m.id));
+    localStorage.setItem(LOCAL_EXAM_MANAGERS_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.error('Failed to save local exam managers:', error);
   }
@@ -380,7 +420,9 @@ export function saveLocalExamManagers(managers: ExamManager[]) {
 export function getLocalExamRecords(): StudentExamInfo[] {
   try {
     const data = localStorage.getItem(LOCAL_EXAM_RECORDS_KEY);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(EXAM_RECORDS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
   } catch (error) {
     console.error('Failed to load local exam records:', error);
     return [];
@@ -389,7 +431,9 @@ export function getLocalExamRecords(): StudentExamInfo[] {
 
 export function saveLocalExamRecords(records: StudentExamInfo[]) {
   try {
-    localStorage.setItem(LOCAL_EXAM_RECORDS_KEY, JSON.stringify(records));
+    const deletedIds = getDeletedIds(EXAM_RECORDS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_EXAM_RECORDS_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.error('Failed to save local exam records:', error);
   }
@@ -424,6 +468,7 @@ export async function saveExamManager(manager: ExamManager): Promise<void> {
 }
 
 export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
+  const deletedIds = getDeletedIds(EXAM_MANAGERS_COLLECTION);
   let remoteRecords: ExamManager[] = [];
   try {
     await ensureAuthenticated();
@@ -433,7 +478,12 @@ export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
-        remoteRecords.push(data as ExamManager);
+        const record = data as ExamManager;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
       }
     });
   } catch (error) {
@@ -460,6 +510,9 @@ export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
 }
 
 export async function deleteExamManager(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(EXAM_MANAGERS_COLLECTION, id);
+
   const local = getLocalExamManagers();
   const updated = local.filter(m => m.id !== id);
   saveLocalExamManagers(updated);
@@ -503,6 +556,7 @@ export async function saveStudentExamInfo(record: StudentExamInfo): Promise<void
 }
 
 export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]> {
+  const deletedIds = getDeletedIds(EXAM_RECORDS_COLLECTION);
   let remoteRecords: StudentExamInfo[] = [];
   try {
     await ensureAuthenticated();
@@ -512,7 +566,12 @@ export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]>
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
-        remoteRecords.push(data as StudentExamInfo);
+        const record = data as StudentExamInfo;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
       }
     });
   } catch (error) {
@@ -539,6 +598,9 @@ export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]>
 }
 
 export async function deleteStudentExamInfo(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(EXAM_RECORDS_COLLECTION, id);
+
   const local = getLocalExamRecords();
   const updated = local.filter(r => r.id !== id);
   saveLocalExamRecords(updated);
@@ -559,7 +621,9 @@ const LOCAL_DEGREE_RECORDS_KEY = 'aiou_local_degree_records';
 export function getLocalDegreeRecords(): StudentDegreeRecord[] {
   try {
     const data = localStorage.getItem(LOCAL_DEGREE_RECORDS_KEY);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(DEGREE_RECORDS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
   } catch (error) {
     console.error('Failed to load local degree records:', error);
     return [];
@@ -568,7 +632,9 @@ export function getLocalDegreeRecords(): StudentDegreeRecord[] {
 
 export function saveLocalDegreeRecords(records: StudentDegreeRecord[]): void {
   try {
-    localStorage.setItem(LOCAL_DEGREE_RECORDS_KEY, JSON.stringify(records));
+    const deletedIds = getDeletedIds(DEGREE_RECORDS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_DEGREE_RECORDS_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.error('Failed to save local degree records:', error);
   }
@@ -603,6 +669,7 @@ export async function saveStudentDegreeRecord(record: StudentDegreeRecord): Prom
 }
 
 export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeRecord[]> {
+  const deletedIds = getDeletedIds(DEGREE_RECORDS_COLLECTION);
   let remoteRecords: StudentDegreeRecord[] = [];
   try {
     await ensureAuthenticated();
@@ -612,7 +679,12 @@ export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeR
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data) {
-        remoteRecords.push(data as StudentDegreeRecord);
+        const record = data as StudentDegreeRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
       }
     });
   } catch (error) {
@@ -639,6 +711,9 @@ export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeR
 }
 
 export async function deleteStudentDegreeRecord(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(DEGREE_RECORDS_COLLECTION, id);
+
   const local = getLocalDegreeRecords();
   const updated = local.filter(r => r.id !== id);
   saveLocalDegreeRecords(updated);

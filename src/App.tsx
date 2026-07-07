@@ -109,8 +109,10 @@ export default function App() {
       const synced = await fetchAndSyncRecords();
       
       // 2. If no records exist, seed some beautiful sample records for a complete demo experience!
-      if (synced.length === 0) {
+      const hasSeeded = localStorage.getItem('aiou_seeded') === 'true';
+      if (synced.length === 0 && !hasSeeded) {
         const sampleRecords = getSampleRecords();
+        localStorage.setItem('aiou_seeded', 'true');
         
         // Save samples to Local Storage and Firestore
         saveLocalRecords(sampleRecords);
@@ -122,7 +124,12 @@ export default function App() {
           }
         }
         setRecords(sampleRecords);
+      } else if (synced.length === 0) {
+        // If the database was cleared or we already seeded, respect the user's intent of an empty database!
+        setRecords([]);
       } else {
+        // If we have records, ensure seeded is marked as true to prevent future accidental reseeding
+        localStorage.setItem('aiou_seeded', 'true');
         setRecords(synced);
       }
       setSyncStatus('synced');
@@ -132,12 +139,17 @@ export default function App() {
       
       // Fallback: Read local storage records
       const local = getLocalRecords();
-      if (local.length === 0) {
+      const hasSeeded = localStorage.getItem('aiou_seeded') === 'true';
+      if (local.length === 0 && !hasSeeded) {
         console.log('No local records found on this browser. Seeding sample demo records locally.');
         const sampleRecords = getSampleRecords();
+        localStorage.setItem('aiou_seeded', 'true');
         saveLocalRecords(sampleRecords);
         setRecords(sampleRecords);
+      } else if (local.length === 0) {
+        setRecords([]);
       } else {
+        localStorage.setItem('aiou_seeded', 'true');
         setRecords(local);
       }
     } finally {
