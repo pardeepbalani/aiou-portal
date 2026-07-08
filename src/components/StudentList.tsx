@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StudentRecord, PROGRAM_OPTIONS } from '../types';
+import SecurityAuthModal from './SecurityAuthModal';
 import { 
   Search, 
   Filter, 
@@ -43,6 +44,10 @@ export default function StudentList({
   const [selectedProgram, setSelectedProgram] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+
+  // Security Auth Modal for Deletion
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Extract unique years from records for the filter dropdown
   const uniqueYears = Array.from(new Set(records.map(r => r.admissionYear))).sort().reverse();
@@ -523,10 +528,9 @@ export default function StudentList({
                           
                           {/* Inline Delete trigger */}
                           <button
-                            onClick={async () => {
-                              if (confirm(`Are you sure you want to delete the record of ${r.studentName}?`)) {
-                                await onDeleteStudent(r.id);
-                              }
+                            onClick={() => {
+                              setStudentToDelete({ id: r.id, name: r.studentName });
+                              setDeleteModalOpen(true);
                             }}
                             className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors cursor-pointer"
                             title="Delete Student Record"
@@ -544,6 +548,23 @@ export default function StudentList({
 
         </div>
       )}
+
+      <SecurityAuthModal
+        isOpen={deleteModalOpen}
+        message={`Are you sure you want to delete the student record of ${studentToDelete?.name}? This action is irreversible.`}
+        onConfirm={async () => {
+          if (studentToDelete) {
+            await onDeleteStudent(studentToDelete.id);
+            setDeleteModalOpen(false);
+            setStudentToDelete(null);
+          }
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setStudentToDelete(null);
+        }}
+        theme={theme}
+      />
 
     </div>
   );

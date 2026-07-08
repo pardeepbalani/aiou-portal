@@ -33,6 +33,7 @@ import {
   ExamPaymentHistory,
   StudentExamSemester
 } from '../types';
+import SecurityAuthModal from './SecurityAuthModal';
 import { 
   saveExamManager, 
   fetchAndSyncExamManagers, 
@@ -105,6 +106,12 @@ export default function ExamRecordsModule({
 
   // Toast simulations
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Security Auth Modal for Deletion
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<'manager' | 'exam_info' | null>(null);
+  const [idToDelete, setIdToDelete] = useState<string | null>(null);
+  const [deleteMessage, setDeleteMessage] = useState<string>('');
 
   // Direct helper to update a single semester's records inside the multi-semester form
   const updateSemester = (semId: string, fields: Partial<StudentExamSemester>) => {
@@ -304,21 +311,14 @@ export default function ExamRecordsModule({
   };
 
   // Handle Exam Manager Delete
-  const handleDeleteManagerClick = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteManagerClick = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this Exam Manager? All associated records will remain but will lack an assigned manager.')) {
-      try {
-        await deleteExamManager(id);
-        const updated = await fetchAndSyncExamManagers();
-        setManagers(updated);
-        if (selectedManager?.id === id) {
-          setSelectedManager(null);
-        }
-        triggerToast('Exam Manager deleted.');
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    const mgr = managers.find(m => m.id === id);
+    const name = mgr ? mgr.name : 'this manager';
+    setIdToDelete(id);
+    setDeleteType('manager');
+    setDeleteMessage(`Are you sure you want to delete the Exam Manager "${name}"? All associated records will remain but will lack an assigned manager.`);
+    setDeleteModalOpen(true);
   };
 
   // Trigger Student Exam Form Add
@@ -414,16 +414,39 @@ export default function ExamRecordsModule({
   };
 
   // Handle Student Exam Record Delete
-  const handleDeleteExamClick = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this student exam registration?')) {
-      try {
-        await deleteStudentExamInfo(id);
+  const handleDeleteExamClick = (id: string) => {
+    const rec = examRecords.find(r => r.id === id);
+    const name = rec ? rec.studentName : 'this exam registration';
+    setIdToDelete(id);
+    setDeleteType('exam_info');
+    setDeleteMessage(`Are you sure you want to delete the student exam registration for "${name}"?`);
+    setDeleteModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!idToDelete || !deleteType) return;
+    try {
+      if (deleteType === 'manager') {
+        await deleteExamManager(idToDelete);
+        const updated = await fetchAndSyncExamManagers();
+        setManagers(updated);
+        if (selectedManager?.id === idToDelete) {
+          setSelectedManager(null);
+        }
+        triggerToast('Exam Manager deleted.');
+      } else if (deleteType === 'exam_info') {
+        await deleteStudentExamInfo(idToDelete);
         const updated = await fetchAndSyncStudentExamInfos();
         setNormalizedExamRecords(updated);
         triggerToast('Exam registration deleted.');
-      } catch (err) {
-        console.error(err);
       }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error deleting record.');
+    } finally {
+      setDeleteModalOpen(false);
+      setIdToDelete(null);
+      setDeleteType(null);
     }
   };
 
@@ -1815,6 +1838,18 @@ export default function ExamRecordsModule({
           </div>
         </div>
       )}
+
+      <SecurityAuthModal
+        isOpen={deleteModalOpen}
+        message={deleteMessage}
+        onConfirm={executeDelete}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setIdToDelete(null);
+          setDeleteType(null);
+        }}
+        theme={theme}
+      />
 
     </div>
   );

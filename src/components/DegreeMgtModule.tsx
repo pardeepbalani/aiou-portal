@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { StudentRecord, StudentDegreeRecord, DegreePaymentHistory } from '../types';
+import SecurityAuthModal from './SecurityAuthModal';
 import { 
   saveStudentDegreeRecord, 
   fetchAndSyncStudentDegreeRecords, 
@@ -78,6 +79,11 @@ export default function DegreeMgtModule({
 
   // UI Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Security Auth Modal for Deletion
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [idToDelete, setIdToDelete] = useState<string | null>(null);
+  const [deleteDetails, setDeleteDetails] = useState<string>('');
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
 
   // Print Preview state
@@ -222,18 +228,26 @@ export default function DegreeMgtModule({
     }
   };
 
-  const handleDeleteRecord = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this degree record? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteRecord = (id: string) => {
+    const record = degreeRecords.find(r => r.id === id);
+    const detailsName = record ? (record.studentName || 'Student Degree Record') : 'Degree Record';
+    setIdToDelete(id);
+    setDeleteDetails(`Are you sure you want to delete the degree application record of ${detailsName}? This action is irreversible.`);
+    setDeleteModalOpen(true);
+  };
 
+  const executeDeleteRecord = async () => {
+    if (!idToDelete) return;
     try {
-      await deleteStudentDegreeRecord(id);
+      await deleteStudentDegreeRecord(idToDelete);
       triggerToast('Degree application deleted successfully.');
       loadDegreeRecords();
     } catch (error) {
       console.error(error);
       triggerToast('Error deleting record.');
+    } finally {
+      setDeleteModalOpen(false);
+      setIdToDelete(null);
     }
   };
 
@@ -1016,6 +1030,17 @@ export default function DegreeMgtModule({
           </div>
         </div>
       )}
+
+      <SecurityAuthModal
+        isOpen={deleteModalOpen}
+        message={deleteDetails}
+        onConfirm={executeDeleteRecord}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setIdToDelete(null);
+        }}
+        theme={theme}
+      />
 
     </div>
   );
