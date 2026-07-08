@@ -13,7 +13,8 @@ import {
   PieChart,
   Search,
   ArrowRight,
-  Award
+  Award,
+  Bell
 } from 'lucide-react';
 import { StudentRecord } from '../types';
 
@@ -22,6 +23,7 @@ interface DashboardProps {
   onSelectPrevious: () => void;
   onSelectExamRecords: () => void;
   onSelectDegreeMgt: () => void;
+  onSelectQuizMgt: () => void;
   theme: 'green' | 'blue';
   stats: {
     totalStudents: number;
@@ -37,6 +39,7 @@ export default function Dashboard({
   onSelectPrevious,
   onSelectExamRecords,
   onSelectDegreeMgt,
+  onSelectQuizMgt,
   theme,
   stats,
   records,
@@ -211,7 +214,7 @@ export default function Dashboard({
       </div>
 
       {/* Main Call to Action Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* Enroll Card */}
         <button
           onClick={onSelectEnroll}
@@ -301,6 +304,29 @@ export default function Dashboard({
           </h3>
           <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
             Apply for student degree issuance, select Normal or Urgent processing, track total days elapsed, and manage degree fee ledgers.
+          </p>
+        </button>
+
+        {/* Quiz Mgt */}
+        <button
+          onClick={onSelectQuizMgt}
+          id="dashboard-quiz-mgt-button"
+          className={`flex flex-col items-center md:items-start md:text-left p-6 bg-white border rounded-2xl cursor-pointer group hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${
+            isGreen
+              ? 'border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/10'
+              : 'border-sky-100 hover:border-sky-300 hover:bg-sky-50/10'
+          }`}
+        >
+          <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
+            isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
+          }`}>
+            <Bell size={28} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 group-hover:text-amber-700 transition-colors">
+            Quiz Mgt
+          </h3>
+          <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
+            Monitor dynamic quiz schedules of all students, schedule course paper dates, set timely alarm alerts, and send SMS/WhatsApp reminders.
           </p>
         </button>
       </div>

@@ -11,7 +11,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -771,4 +771,118 @@ export async function deleteStudentDegreeRecord(id: string): Promise<void> {
     setQuotaExceeded(true);
   }
 }
+
+const QUIZ_RECORDS_COLLECTION = 'quiz_records';
+const LOCAL_QUIZ_RECORDS_KEY = 'aiou_local_quiz_records';
+
+export function getLocalQuizRecords(): StudentQuizRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_QUIZ_RECORDS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(QUIZ_RECORDS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local quiz records:', error);
+    return [];
+  }
+}
+
+export function saveLocalQuizRecords(records: StudentQuizRecord[]): void {
+  try {
+    const deletedIds = getDeletedIds(QUIZ_RECORDS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_QUIZ_RECORDS_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local quiz records:', error);
+  }
+}
+
+export async function saveStudentQuizRecord(record: StudentQuizRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  const local = getLocalQuizRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalQuizRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, QUIZ_RECORDS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.warn('Firestore write failed for Student Quiz Record, using local fallback. Error:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncStudentQuizRecords(): Promise<StudentQuizRecord[]> {
+  const deletedIds = getDeletedIds(QUIZ_RECORDS_COLLECTION);
+  let remoteRecords: StudentQuizRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, QUIZ_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as StudentQuizRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Student Quiz Records. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalQuizRecords();
+  }
+
+  const local = getLocalQuizRecords();
+  const mergedMap = new Map<string, StudentQuizRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalQuizRecords(merged);
+  return merged;
+}
+
+export async function deleteStudentQuizRecord(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(QUIZ_RECORDS_COLLECTION, id);
+
+  const local = getLocalQuizRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalQuizRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, QUIZ_RECORDS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.error('Firestore delete failed for Student Quiz Record:', error);
+    setQuotaExceeded(true);
+  }
+}
+
 

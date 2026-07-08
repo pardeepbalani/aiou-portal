@@ -187,3 +187,18 @@ export interface StudentDegreeRecord {
   updatedAt: string;
 }
 
+export interface StudentQuizRecord {
+  id: string;
+  studentName: string;
+  fatherName: string;
+  studentId: string; // main registration ID or unique lookup id
+  contactNumber: string;
+  courseCode: string;
+  quizDate: string; // YYYY-MM-DD
+  status: 'Pending' | 'Completed' | 'Overdue';
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
