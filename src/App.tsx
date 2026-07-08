@@ -164,6 +164,16 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
+  // Centralized hook to keep selectedStudent state synchronized with records to avoid stale details views
+  useEffect(() => {
+    if (selectedStudent) {
+      const updated = records.find(r => r.id === selectedStudent.id);
+      if (updated && JSON.stringify(updated) !== JSON.stringify(selectedStudent)) {
+        setSelectedStudent(updated);
+      }
+    }
+  }, [records, selectedStudent]);
+
   // Handle successful login
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
@@ -207,6 +217,10 @@ export default function App() {
     await saveStudentRecord(record);
     // Reload database
     await loadData();
+    // Keep selected student updated to reflect freshly saved changes immediately
+    if (selectedStudent && selectedStudent.id === record.id) {
+      setSelectedStudent(record);
+    }
   };
 
   // Delete student record handler

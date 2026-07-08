@@ -34,6 +34,7 @@ export type StudentStatus = 'active' | 'completed' | 'suspended';
 
 export interface StudentRecord {
   id: string; // Document ID (usually firestore auto-ID or Registration ID)
+  isDeleted?: boolean; // Tombstone flag for robust offline-first synchronization
   
   // Personal Info
   studentName: string;

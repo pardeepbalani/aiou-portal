@@ -165,6 +165,7 @@ export function sanitizeStudentRecord(r: any): StudentRecord {
     programSelected: typeof r?.programSelected === 'string' ? r.programSelected : 'B.Ed (1.5 Years)',
     semesterType: r?.semesterType === 'Spring' ? 'Spring' : 'Autumn',
     semesters: sanitizeSemesters(r?.semesters),
+    isDeleted: Boolean(r?.isDeleted),
     totalReceivable: Number(r?.totalReceivable) || 0,
     paymentsList: sanitizePayments(r?.paymentsList),
     serviceChargesAmount: Number(r?.serviceChargesAmount) || 0,
@@ -207,13 +208,16 @@ export function addDeletedId(collectionName: string, id: string) {
 /**
  * Get all records from local storage.
  */
-export function getLocalRecords(): StudentRecord[] {
+export function getLocalRecords(includeDeleted = true): StudentRecord[] {
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEY);
     const parsed = data ? JSON.parse(data) : [];
     const records = Array.isArray(parsed) ? parsed.map(sanitizeStudentRecord) : [];
     const deletedIds = getDeletedIds(COLLECTION_NAME);
-    return records.filter(r => !deletedIds.includes(r.id));
+    return records.filter(r => {
+      const isDeletedLocally = deletedIds.includes(r.id) || r.isDeleted;
+      return includeDeleted ? true : !isDeletedLocally;
+    });
   } catch (error) {
     console.error('Failed to load local records:', error);
     return [];
@@ -225,9 +229,7 @@ export function getLocalRecords(): StudentRecord[] {
  */
 export function saveLocalRecords(records: StudentRecord[]) {
   try {
-    const deletedIds = getDeletedIds(COLLECTION_NAME);
-    const filtered = records.filter(r => !deletedIds.includes(r.id));
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(records));
   } catch (error) {
     console.error('Failed to save local records:', error);
   }
@@ -260,7 +262,7 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
   };
 
   // 1. Save locally first (immediate offline feedback)
-  const localRecords = getLocalRecords();
+  const localRecords = getLocalRecords(true);
   const index = localRecords.findIndex(r => r.id === updatedRecord.id);
   if (index >= 0) {
     localRecords[index] = updatedRecord;
@@ -296,8 +298,14 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
       const data = doc.data();
       if (data) {
         const record = sanitizeStudentRecord(data);
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        if (deletedIds.includes(record.id) || record.isDeleted) {
+          if (record.isDeleted) {
+            remoteRecords.push(record);
+          } else {
+            // Hard-delete or soft-delete remote record to match local deletion
+            setDoc(doc.ref, { ...record, isDeleted: true, updatedAt: new Date().toISOString() })
+              .catch(e => console.warn('Delayed soft-delete sync failed for', record.id, e));
+          }
         } else {
           remoteRecords.push(record);
         }
@@ -306,12 +314,12 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
   } catch (error) {
     console.error('Firestore load failed. Reading local records only.', error);
     setQuotaExceeded(true);
-    return getLocalRecords();
+    return getLocalRecords(false);
   }
 
   // Merge remote records with local records
   // In case of conflict, prefer the one with the newer updatedAt timestamp
-  const localRecords = getLocalRecords();
+  const localRecords = getLocalRecords(true);
   const mergedMap = new Map<string, StudentRecord>();
 
   // Add local records first
@@ -363,7 +371,7 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     }
   }
 
-  return mergedRecords;
+  return mergedRecords.filter(r => !r.isDeleted);
 }
 
 /**
@@ -373,18 +381,54 @@ export async function deleteStudentRecord(id: string): Promise<void> {
   // Add to deleted tracking
   addDeletedId(COLLECTION_NAME, id);
 
-  // Delete locally
-  const localRecords = getLocalRecords();
-  const updated = localRecords.filter(r => r.id !== id);
-  saveLocalRecords(updated);
+  // Soft-delete locally first
+  const localRecords = getLocalRecords(true);
+  const index = localRecords.findIndex(r => r.id === id);
+  let recordToUpdate: StudentRecord | null = null;
+  if (index >= 0) {
+    recordToUpdate = {
+      ...localRecords[index],
+      isDeleted: true,
+      updatedAt: new Date().toISOString()
+    };
+    localRecords[index] = recordToUpdate;
+  } else {
+    recordToUpdate = {
+      id,
+      isDeleted: true,
+      studentName: '',
+      fatherName: '',
+      phoneNumber: '',
+      registrationId: '',
+      lmsPasswordId: '',
+      cmsPasswordId: '',
+      admissionYear: '',
+      programSelected: '',
+      semesterType: 'Autumn',
+      semesters: [],
+      totalReceivable: 0,
+      paymentsList: [],
+      serviceEnrollment: false,
+      serviceWorkshops: false,
+      serviceQuiz: false,
+      serviceAssignments: false,
+      servicePhysicalWorkshop: false,
+      serviceResearchReport: false,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    localRecords.push(recordToUpdate);
+  }
+  saveLocalRecords(localRecords);
 
-  // Delete from Firestore
+  // Soft-delete on Firestore
   try {
     await ensureAuthenticated();
-    await deleteDoc(doc(db, COLLECTION_NAME, id));
+    await setDoc(doc(db, COLLECTION_NAME, id), recordToUpdate);
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
-    console.error('Firestore delete failed:', error);
+    console.warn('Firestore soft-delete failed, using local fallback. Error:', error);
     setQuotaExceeded(true);
   }
 }

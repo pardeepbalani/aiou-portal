@@ -98,7 +98,7 @@ export default function EnrollmentForm({
       setAdmissionYear(initialStudent.admissionYear);
       setSemesterType(initialStudent.semesterType);
       
-      const deepCopiedSemesters: SemesterData[] = JSON.parse(JSON.stringify(initialStudent.semesters));
+      const deepCopiedSemesters: SemesterData[] = JSON.parse(JSON.stringify(initialStudent.semesters || []));
       
       // Migrate legacy global payment data to first semester if semester-level payment history is empty
       const hasAnySemesterPayments = deepCopiedSemesters.some(sem => sem.paymentsList && sem.paymentsList.length > 0);
@@ -123,6 +123,30 @@ export default function EnrollmentForm({
         deepCopiedSemesters[0].servicePhysicalWorkshop = initialStudent.servicePhysicalWorkshop;
         deepCopiedSemesters[0].serviceResearchReport = initialStudent.serviceResearchReport;
         deepCopiedSemesters[0].remarks = initialStudent.remarks;
+      }
+
+      // Ensure the semesters array contains exactly totalSemesters semesters, padding with empty courses if necessary
+      if (deepCopiedSemesters.length < totalSemesters) {
+        for (let s = deepCopiedSemesters.length + 1; s <= totalSemesters; s++) {
+          const courses: CourseData[] = [];
+          for (let c = 1; c <= 6; c++) {
+            courses.push({
+              code: '',
+              assignment: false,
+              workshop: false,
+              quiz: false,
+              assignment1: false,
+              assignment2: false,
+            });
+          }
+          deepCopiedSemesters.push({
+            semesterNumber: s,
+            courses,
+          });
+        }
+      } else if (deepCopiedSemesters.length > totalSemesters) {
+        // Truncate to match total semesters of the program
+        deepCopiedSemesters.splice(totalSemesters);
       }
 
       setSemesters(deepCopiedSemesters);
