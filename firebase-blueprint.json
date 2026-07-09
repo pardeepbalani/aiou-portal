@@ -148,6 +148,62 @@
         "studentId", "contactNumber", "semesterTerm", "courseCodes", "examDates", 
         "totalFee", "amountReceived", "remainingBalance", "paymentHistory", "createdAt", "updatedAt"
       ]
+    },
+    "StudentDegreeRecord": {
+      "title": "StudentDegreeRecord",
+      "description": "Student degree application details including payment ledgers, processing status, and tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentName": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "studentId": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "courseName": { "type": "string" },
+        "category": { "type": "string", "enum": ["Normal", "Urgent"] },
+        "appliedDate": { "type": "string" },
+        "degreeReceivedDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Applied", "Under Process", "Dispatched", "Received at Hub", "Delivered to Student"] },
+        "totalFee": { "type": "number" },
+        "amountReceived": { "type": "number" },
+        "paymentHistory": { "type": "array" },
+        "trackingNumber": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["Pending", "Verified", "Rejected"] },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": [
+        "id", "studentName", "fatherName", "studentId", "contactNumber", "courseName",
+        "category", "appliedDate", "status", "totalFee", "amountReceived", "paymentHistory",
+        "verificationStatus", "createdAt", "updatedAt"
+      ]
+    },
+    "StudentQuizRecord": {
+      "title": "StudentQuizRecord",
+      "description": "Student online quiz schedules, specific course codes, scheduled dates, and completion status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentName": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "studentId": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "quizDate": { "type": "string" },
+        "quizDateFrom": { "type": "string" },
+        "quizDateTo": { "type": "string" },
+        "quizStartTime": { "type": "string" },
+        "quizEndTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Completed", "Overdue"] },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": [
+        "id", "studentName", "fatherName", "studentId", "contactNumber", "courseCode",
+        "quizDate", "status", "createdAt", "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -162,6 +218,14 @@
     "/exam_records/{recordId}": {
       "schema": "StudentExamInfo",
       "description": "Collection storing examination schedules and payment logs for students"
+    },
+    "/degree_records/{recordId}": {
+      "schema": "StudentDegreeRecord",
+      "description": "Collection storing degree application information, verification logs, and dispatch states"
+    },
+    "/quiz_records/{recordId}": {
+      "schema": "StudentQuizRecord",
+      "description": "Collection storing student online quiz dates, course details, and active reminders"
     }
   }
 }

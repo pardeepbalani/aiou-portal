@@ -67,9 +67,24 @@ export default function QuizMgtModule({
   const [contactNumber, setContactNumber] = useState('');
   const [courseCode, setCourseCode] = useState('');
   const [quizDate, setQuizDate] = useState('');
+  const [quizDateFrom, setQuizDateFrom] = useState('');
+  const [quizDateTo, setQuizDateTo] = useState('');
+  const [quizStartTime, setQuizStartTime] = useState('09:00');
+  const [quizEndTime, setQuizEndTime] = useState('23:59');
   const [status, setStatus] = useState<'Pending' | 'Completed'>('Pending');
+  const [programSelected, setProgramSelected] = useState('B.Ed (1.5 Years)');
   const [remarks, setRemarks] = useState('');
   const [addToMainDirectory, setAddToMainDirectory] = useState(false);
+
+  // Real-time tick-tock for 2-hour action alarms
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000); // update every 10s
+    return () => clearInterval(timer);
+  }, []);
 
   // Security Auth Modal for Delete
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -125,6 +140,7 @@ export default function QuizMgtModule({
         setFatherName(student.fatherName);
         setStudentId(student.registrationId);
         setContactNumber(student.phoneNumber);
+        setProgramSelected(student.programSelected || 'B.Ed (1.5 Years)');
         setAddToMainDirectory(false);
       }
     } else if (!editingRecord) {
@@ -132,13 +148,15 @@ export default function QuizMgtModule({
       setFatherName('');
       setStudentId('');
       setContactNumber('');
+      setProgramSelected('B.Ed (1.5 Years)');
     }
   }, [selectedMainStudentId]);
 
   // Form submission handler
   const handleSaveQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName || !studentId || !courseCode || !quizDate) {
+    const activeQuizDate = quizDateFrom || quizDate;
+    if (!studentName || !studentId || !courseCode || !activeQuizDate) {
       triggerToast('Please fill in all mandatory fields.');
       return;
     }
@@ -151,8 +169,13 @@ export default function QuizMgtModule({
       studentId: studentId.trim().toUpperCase(),
       contactNumber: contactNumber.trim(),
       courseCode: courseCode.trim().toUpperCase(),
-      quizDate,
+      quizDate: activeQuizDate,
+      quizDateFrom: quizDateFrom || activeQuizDate,
+      quizDateTo: quizDateTo || quizDateFrom || activeQuizDate,
+      quizStartTime: quizStartTime || '09:00',
+      quizEndTime: quizEndTime || '23:59',
       status: editingRecord ? (status as any) : 'Pending',
+      programSelected,
       remarks: remarks.trim(),
       createdAt: editingRecord ? editingRecord.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -174,8 +197,8 @@ export default function QuizMgtModule({
             registrationId: studentId.trim().toUpperCase(),
             lmsPasswordId: '',
             cmsPasswordId: '',
-            admissionYear: new Date(quizDate).getFullYear().toString(),
-            programSelected: 'B.Ed (1.5 Years)', // Default
+            admissionYear: new Date(activeQuizDate).getFullYear().toString(),
+            programSelected: programSelected,
             semesterType: 'Autumn',
             semesters: [
               {
@@ -214,7 +237,12 @@ export default function QuizMgtModule({
       setContactNumber('');
       setCourseCode('');
       setQuizDate('');
+      setQuizDateFrom('');
+      setQuizDateTo('');
+      setQuizStartTime('09:00');
+      setQuizEndTime('23:59');
       setStatus('Pending');
+      setProgramSelected('B.Ed (1.5 Years)');
       setRemarks('');
       setAddToMainDirectory(false);
       
@@ -235,7 +263,12 @@ export default function QuizMgtModule({
     setContactNumber(rec.contactNumber);
     setCourseCode(rec.courseCode);
     setQuizDate(rec.quizDate);
+    setQuizDateFrom(rec.quizDateFrom || rec.quizDate);
+    setQuizDateTo(rec.quizDateTo || rec.quizDateFrom || rec.quizDate);
+    setQuizStartTime(rec.quizStartTime || '09:00');
+    setQuizEndTime(rec.quizEndTime || '23:59');
     setStatus(rec.status === 'Overdue' ? 'Pending' : rec.status as any);
+    setProgramSelected(rec.programSelected || 'B.Ed (1.5 Years)');
     setRemarks(rec.remarks || '');
     setSelectedMainStudentId('');
     setAddToMainDirectory(false);
@@ -284,6 +317,48 @@ export default function QuizMgtModule({
     }
   };
 
+  // Helper to compute quiz and 2-hour timely alarm information
+  const getQuizAlarmInfo = (rec: StudentQuizRecord) => {
+    const sDate = rec.quizDateFrom || rec.quizDate;
+    const sTime = rec.quizStartTime || '09:00';
+    const eDate = rec.quizDateTo || rec.quizDateFrom || rec.quizDate;
+    const eTime = rec.quizEndTime || '23:59';
+
+    // Parse date objects securely
+    const startDateTime = new Date(`${sDate}T${sTime}`);
+    const endDateTime = new Date(`${eDate}T${eTime}`);
+    const alarmDateTime = new Date(startDateTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+
+    const isAlarmValid = alarmDateTime <= endDateTime;
+    
+    // Status relative to currentTime
+    let alarmStatus: 'Upcoming' | 'CountingDown' | 'Ringing' | 'Ended' = 'Upcoming';
+    if (currentTime > endDateTime) {
+      alarmStatus = 'Ended';
+    } else if (currentTime >= alarmDateTime) {
+      alarmStatus = 'Ringing';
+    } else if (currentTime >= startDateTime) {
+      alarmStatus = 'CountingDown';
+    }
+
+    // Minutes remaining to alarm
+    const diffMs = alarmDateTime.getTime() - currentTime.getTime();
+    const minutesLeft = Math.max(0, Math.floor(diffMs / 60000));
+
+    return {
+      sDate,
+      sTime,
+      eDate,
+      eTime,
+      startDateTime,
+      endDateTime,
+      alarmDateTime,
+      isAlarmValid,
+      alarmStatus,
+      minutesLeft
+    };
+  };
+
   // Reminders / Alerts generator
   const todayStr = new Date().toISOString().split('T')[0];
   const upcomingThresholdDate = new Date();
@@ -292,8 +367,15 @@ export default function QuizMgtModule({
 
   const criticalAlarms = computedRecords.filter(rec => {
     if (rec.status === 'Completed') return false;
-    return rec.quizDate <= todayStr || (rec.quizDate <= upcomingThresholdStr);
-  }).sort((a, b) => a.quizDate.localeCompare(b.quizDate));
+    const info = getQuizAlarmInfo(rec);
+    return rec.quizDate <= todayStr || (rec.quizDate <= upcomingThresholdStr) || (info.alarmStatus === 'Ringing');
+  }).sort((a, b) => {
+    const dateCompare = a.quizDate.localeCompare(b.quizDate);
+    if (dateCompare !== 0) return dateCompare;
+    const aTime = a.quizStartTime || '00:00';
+    const bTime = b.quizStartTime || '00:00';
+    return aTime.localeCompare(bTime);
+  });
 
   // WhatsApp reminder message builder
   const handleSendWhatsApp = (rec: StudentQuizRecord) => {
@@ -304,7 +386,12 @@ export default function QuizMgtModule({
     const cleanPhone = rec.contactNumber.replace(/[^0-9]/g, '');
     const phoneWithCountry = cleanPhone.startsWith('03') ? '92' + cleanPhone.substring(1) : cleanPhone;
     
-    const message = `Dear ${rec.studentName},\n\nThis is a friendly reminder that your online Quiz for AIOU course *${rec.courseCode}* is scheduled/due on *${rec.quizDate}*.\n\nPlease make sure to log in to your LMS portal on time and complete it. If you need assistance with LMS login credentials or portal checks, please reach out.\n\nBest regards,\nAIOU Support Desk`;
+    const info = getQuizAlarmInfo(rec);
+    const dateRangeStr = info.sDate === info.eDate
+      ? `on *${info.sDate}* from *${info.sTime} to ${info.eTime}*`
+      : `from *${info.sDate} (${info.sTime})* to *${info.eDate} (${info.eTime})*`;
+
+    const message = `Dear ${rec.studentName},\n\nThis is a friendly reminder that your online Quiz for AIOU course *${rec.courseCode}* is scheduled ${dateRangeStr}.\n\nPlease make sure to log in to your LMS portal on time and complete it. An active monitoring alarm is set for 2 hours after start. If you need assistance, please contact us.\n\nBest regards,\nAIOU Support Desk`;
     const url = `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -371,6 +458,10 @@ export default function QuizMgtModule({
             setContactNumber('');
             setCourseCode('');
             setQuizDate('');
+            setQuizDateFrom('');
+            setQuizDateTo('');
+            setQuizStartTime('09:00');
+            setQuizEndTime('23:59');
             setStatus('Pending');
             setRemarks('');
             setAddToMainDirectory(false);
@@ -396,51 +487,96 @@ export default function QuizMgtModule({
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
             {criticalAlarms.map(rec => {
+              const info = getQuizAlarmInfo(rec);
               const isOverdue = rec.quizDate < todayStr;
               const isToday = rec.quizDate === todayStr;
+
+              const alarmTimeStr = info.alarmDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+              const startTimeStr = info.startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+              const endTimeStr = info.endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
               return (
                 <div 
                   key={rec.id} 
-                  className={`p-3 rounded-xl border flex flex-col justify-between gap-2 shadow-4xs ${
-                    isOverdue 
-                      ? 'bg-red-50 border-red-200 text-red-950' 
-                      : isToday 
-                        ? 'bg-amber-50 border-amber-200 text-amber-950' 
-                        : 'bg-blue-50/50 border-blue-200 text-blue-950'
+                  className={`p-3 rounded-xl border flex flex-col justify-between gap-3 shadow-4xs ${
+                    info.alarmStatus === 'Ringing'
+                      ? 'bg-red-100/80 border-red-300 text-red-950 ring-2 ring-red-500/20'
+                      : isOverdue 
+                        ? 'bg-red-50 border-red-200 text-red-950' 
+                        : isToday 
+                          ? 'bg-amber-50 border-amber-200 text-amber-950' 
+                          : 'bg-blue-50/50 border-blue-200 text-blue-950'
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs block truncate max-w-[150px]">{rec.studentName}</span>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
-                        isOverdue 
-                          ? 'bg-red-200 text-red-800' 
-                          : isToday 
-                            ? 'bg-amber-200 text-amber-800 animate-pulse' 
-                            : 'bg-blue-200 text-blue-800'
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-extrabold text-xs block truncate max-w-[130px]">{rec.studentName}</span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
+                        info.alarmStatus === 'Ringing'
+                          ? 'bg-red-600 text-white animate-pulse'
+                          : isOverdue 
+                            ? 'bg-red-200 text-red-800' 
+                            : isToday 
+                              ? 'bg-amber-200 text-amber-800 animate-pulse' 
+                              : 'bg-blue-200 text-blue-800'
                       }`}>
-                        {isOverdue ? 'Overdue' : isToday ? 'Due Today' : 'Approaching'}
+                        {info.alarmStatus === 'Ringing' ? 'Alarm Ringing!' : isOverdue ? 'Overdue' : isToday ? 'Due Today' : 'Approaching'}
                       </span>
                     </div>
-                    <div className="text-[11px] mt-1 text-gray-500 space-y-0.5">
-                      <p>Course: <strong className="font-mono text-gray-950">{rec.courseCode}</strong></p>
-                      <p className="flex items-center gap-1">
-                        <Calendar size={10} />
-                        <span>Date: <strong className="font-mono text-gray-950">{rec.quizDate}</strong></span>
+
+                    <div className="text-[11px] text-gray-500 space-y-1">
+                      <p className="flex justify-between">
+                        <span>Course Code:</span>
+                        <strong className="font-mono text-gray-950 bg-white/60 px-1 rounded border border-gray-200">{rec.courseCode}</strong>
                       </p>
+                      
+                      <div className="bg-white/40 p-1.5 rounded-lg border border-gray-200/50 space-y-0.5 text-[10px]">
+                        <p className="flex justify-between text-gray-600">
+                          <span>Start:</span>
+                          <span className="font-mono font-bold text-gray-900">{info.sDate} @ {startTimeStr}</span>
+                        </p>
+                        <p className="flex justify-between text-gray-600">
+                          <span>End:</span>
+                          <span className="font-mono font-bold text-gray-900">{info.eDate} @ {endTimeStr}</span>
+                        </p>
+                      </div>
+
+                      {/* 2-Hour Action Alarm Indicator */}
+                      <div className={`p-1.5 rounded-lg border flex items-center justify-between text-[10px] ${
+                        info.alarmStatus === 'Ringing'
+                          ? 'bg-red-50 border-red-200 text-red-700 animate-pulse'
+                          : info.alarmStatus === 'CountingDown'
+                            ? 'bg-blue-50 border-blue-150 text-blue-700'
+                            : 'bg-gray-50 border-gray-200 text-gray-600'
+                      }`}>
+                        <div className="flex items-center gap-1 font-bold">
+                          <Clock size={11} className={info.alarmStatus === 'Ringing' ? 'animate-spin text-red-500' : ''} />
+                          <span>2h Alarm:</span>
+                        </div>
+                        <span className="font-mono font-black">
+                          {info.alarmStatus === 'Ringing' 
+                            ? `RINGING (${alarmTimeStr})` 
+                            : info.alarmStatus === 'CountingDown'
+                              ? `Rings in ${info.minutesLeft}m (${alarmTimeStr})`
+                              : info.alarmStatus === 'Ended'
+                                ? `Passed (${alarmTimeStr})`
+                                : `Scheduled (${alarmTimeStr})`}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 pt-1 border-t border-dashed border-gray-200">
+
+                  <div className="flex items-center gap-1.5 pt-1 border-t border-dashed border-gray-200/60">
                     <button
                       onClick={() => handleToggleComplete(rec)}
-                      className="flex-1 bg-white hover:bg-green-50 text-[10px] font-bold text-green-700 py-1 px-1.5 rounded-md border border-green-200 transition-all cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-1 bg-white hover:bg-green-50 text-[10px] font-bold text-green-700 py-1.5 px-1.5 rounded-md border border-green-200 transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       <Check size={10} />
                       <span>Complete</span>
                     </button>
                     <button
                       onClick={() => handleSendWhatsApp(rec)}
-                      className="flex-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold py-1 px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold py-1.5 px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       <MessageSquare size={10} />
                       <span>Alert</span>
@@ -533,6 +669,21 @@ export default function QuizMgtModule({
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="block text-[11px] font-extrabold text-gray-550">Academic Program *</label>
+                  <select
+                    value={programSelected}
+                    onChange={(e) => setProgramSelected(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
+                  >
+                    {PROGRAM_OPTIONS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <label className="block text-[11px] font-extrabold text-gray-550">Contact Number</label>
                   <input
                     type="text"
@@ -542,9 +693,34 @@ export default function QuizMgtModule({
                     className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
                   />
                 </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz Start Date (From) *</label>
+                  <input
+                    type="date"
+                    required
+                    value={quizDateFrom || quizDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setQuizDateFrom(val);
+                      setQuizDate(val);
+                      if (!quizDateTo) setQuizDateTo(val);
+                    }}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz End Date (To) *</label>
+                  <input
+                    type="date"
+                    required
+                    value={quizDateTo || quizDateFrom || quizDate}
+                    onChange={(e) => setQuizDateTo(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                  />
+                </div>
                 <div className="space-y-1">
                   <label className="block text-[11px] font-extrabold text-gray-550">Course Code *</label>
                   <input
@@ -556,31 +732,46 @@ export default function QuizMgtModule({
                     className="w-full p-2.5 border border-gray-300 rounded-lg uppercase font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz Schedule Date *</label>
+                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz Start Time (24h) *</label>
                   <input
-                    type="date"
+                    type="time"
                     required
-                    value={quizDate}
-                    onChange={(e) => setQuizDate(e.target.value)}
+                    value={quizStartTime}
+                    onChange={(e) => setQuizStartTime(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz End Time (24h) *</label>
+                  <input
+                    type="time"
+                    required
+                    value={quizEndTime}
+                    onChange={(e) => setQuizEndTime(e.target.value)}
                     className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
                   />
                 </div>
               </div>
 
-              {editingRecord && (
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz Status</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-3">
+                {editingRecord ? (
+                  <div className="space-y-1 col-span-2">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Quiz Status</label>
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as any)}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
+                ) : null}
+              </div>
 
               <div className="space-y-1">
                 <label className="block text-[11px] font-extrabold text-gray-550">Remarks / Instructions</label>
@@ -705,7 +896,8 @@ export default function QuizMgtModule({
                   <th className="py-3 px-4">Student Details</th>
                   <th className="py-3 px-4 font-mono">Student ID</th>
                   <th className="py-3 px-4 font-mono">Course Code</th>
-                  <th className="py-3 px-4">Quiz Due Date</th>
+                  <th className="py-3 px-4">Quiz Duration</th>
+                  <th className="py-3 px-4">2h Action Alarm</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Remarks</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -713,9 +905,14 @@ export default function QuizMgtModule({
               </thead>
               <tbody className="divide-y divide-gray-150">
                 {filteredRecords.map(rec => {
+                  const info = getQuizAlarmInfo(rec);
                   const isOverdue = rec.status === 'Overdue';
                   const isCompleted = rec.status === 'Completed';
                   const isToday = rec.quizDate === todayStr;
+
+                  const alarmTimeStr = info.alarmDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                  const startTimeStr = info.startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                  const endTimeStr = info.endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
                   return (
                     <tr key={rec.id} className="hover:bg-gray-50/50 transition-colors">
@@ -740,11 +937,43 @@ export default function QuizMgtModule({
                           {rec.courseCode}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1 font-mono font-bold text-gray-700">
+                      <td className="py-3.5 px-4 space-y-1">
+                        <div className="flex items-center gap-1 font-mono font-bold text-gray-800">
                           <Calendar size={12} className="text-gray-400" />
-                          <span>{rec.quizDate}</span>
+                          <span>{info.sDate === info.eDate ? info.sDate : `${info.sDate} to ${info.eDate}`}</span>
                         </div>
+                        <div className="text-[10px] text-gray-450 font-mono">
+                          <span>{startTimeStr} - {endTimeStr}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {isCompleted ? (
+                          <span className="text-[10px] text-green-600 font-bold flex items-center gap-1">
+                            <Check size={12} />
+                            <span>Alarm Completed</span>
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                            info.alarmStatus === 'Ringing'
+                              ? 'bg-red-50 text-red-700 border-red-200 animate-pulse'
+                              : info.alarmStatus === 'CountingDown'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : info.alarmStatus === 'Ended'
+                                  ? 'bg-gray-550/10 text-gray-550 border-transparent'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            <Clock size={10} className={info.alarmStatus === 'Ringing' ? 'animate-spin' : ''} />
+                            <span>
+                              {info.alarmStatus === 'Ringing' 
+                                ? `RINGING! (${alarmTimeStr})` 
+                                : info.alarmStatus === 'CountingDown'
+                                  ? `Rings in ${info.minutesLeft}m`
+                                  : info.alarmStatus === 'Ended'
+                                    ? `Passed (${alarmTimeStr})`
+                                    : `Scheduled (${alarmTimeStr})`}
+                            </span>
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${

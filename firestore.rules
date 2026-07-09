@@ -80,6 +80,48 @@ service cloud.firestore {
         && data.updatedAt is string;
     }
 
+    // Hardened validation function representing the StudentDegreeRecord schema
+    function isValidStudentDegreeRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.studentName is string && data.studentName.size() <= 256
+        && data.fatherName is string && data.fatherName.size() <= 256
+        && data.studentId is string && data.studentId.size() <= 128
+        && data.contactNumber is string && data.contactNumber.size() <= 32
+        && data.courseName is string && data.courseName.size() <= 256
+        && (data.category == 'Normal' || data.category == 'Urgent')
+        && data.appliedDate is string
+        && (!('degreeReceivedDate' in data) || data.degreeReceivedDate is string)
+        && (data.status == 'Applied' || data.status == 'Under Process' || data.status == 'Dispatched' || data.status == 'Received at Hub' || data.status == 'Delivered to Student')
+        && (data.totalFee is int || data.totalFee is float)
+        && (data.amountReceived is int || data.amountReceived is float)
+        && data.paymentHistory is list
+        && (!('trackingNumber' in data) || data.trackingNumber is string)
+        && (data.verificationStatus == 'Pending' || data.verificationStatus == 'Verified' || data.verificationStatus == 'Rejected')
+        && (!('remarks' in data) || data.remarks is string)
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    // Hardened validation function representing the StudentQuizRecord schema
+    function isValidStudentQuizRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.studentName is string && data.studentName.size() <= 256
+        && data.fatherName is string && data.fatherName.size() <= 256
+        && data.studentId is string && data.studentId.size() <= 128
+        && data.contactNumber is string && data.contactNumber.size() <= 32
+        && data.courseCode is string && data.courseCode.size() <= 128
+        && data.quizDate is string
+        && (data.status == 'Pending' || data.status == 'Completed' || data.status == 'Overdue')
+        && (!('programSelected' in data) || data.programSelected is string)
+        && (!('quizDateFrom' in data) || data.quizDateFrom is string)
+        && (!('quizDateTo' in data) || data.quizDateTo is string)
+        && (!('quizStartTime' in data) || data.quizStartTime is string)
+        && (!('quizEndTime' in data) || data.quizEndTime is string)
+        && (!('remarks' in data) || data.remarks is string)
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
     // Rules for students_records collection
     match /students_records/{studentId} {
       // Public read operations are allowed with ID validation
@@ -131,6 +173,40 @@ service cloud.firestore {
         && incoming().id == existing().id
         && incoming().createdAt == existing().createdAt
         && isValidStudentExamInfo(incoming());
+
+      allow delete: if isValidId(recordId);
+    }
+
+    // Rules for degree_records collection
+    match /degree_records/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidStudentDegreeRecord(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidStudentDegreeRecord(incoming());
+
+      allow delete: if isValidId(recordId);
+    }
+
+    // Rules for quiz_records collection
+    match /quiz_records/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidStudentQuizRecord(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidStudentQuizRecord(incoming());
 
       allow delete: if isValidId(recordId);
     }

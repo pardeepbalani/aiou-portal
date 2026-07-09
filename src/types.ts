@@ -195,7 +195,12 @@ export interface StudentQuizRecord {
   contactNumber: string;
   courseCode: string;
   quizDate: string; // YYYY-MM-DD
+  quizDateFrom?: string; // YYYY-MM-DD
+  quizDateTo?: string; // YYYY-MM-DD
+  quizStartTime?: string; // HH:MM
+  quizEndTime?: string; // HH:MM
   status: 'Pending' | 'Completed' | 'Overdue';
+  programSelected?: string;
   remarks?: string;
   createdAt: string;
   updatedAt: string;
