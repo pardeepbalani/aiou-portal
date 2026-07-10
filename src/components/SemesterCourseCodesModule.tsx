@@ -1,26 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Search, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  BookOpen, 
-  User, 
-  Calendar, 
-  ChevronRight, 
   ArrowLeft, 
-  CheckCircle2, 
-  Save, 
-  BookMarked, 
-  X, 
-  Sparkles,
-  AlertCircle,
-  Hash,
-  Award,
-  BookOpenCheck
+  BookOpenCheck,
+  User,
+  GraduationCap,
+  Calendar,
+  Layers,
+  BookOpen,
+  Filter,
+  ChevronRight,
+  BookMarked,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { StudentRecord, SemesterData, CourseData, PROGRAM_OPTIONS, StudentStatus } from '../types';
+import { StudentRecord } from '../types';
 
 interface SemesterCourseCodesModuleProps {
   onBackToDashboard: () => void;
@@ -32,236 +26,62 @@ interface SemesterCourseCodesModuleProps {
 export default function SemesterCourseCodesModule({
   onBackToDashboard,
   studentRecords,
-  onUpdateStudent,
   theme
 }: SemesterCourseCodesModuleProps) {
   const isGreen = theme === 'green';
 
   // State Management
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
-  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
-  
-  // Modals / Editors state
-  const [isSaving, setIsSaving] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedProgramFilter, setSelectedProgramFilter] = useState('All');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
-  // Edit Student Info Modal state
-  const [showStudentInfoModal, setShowStudentInfoModal] = useState(false);
-  const [editStudentName, setEditStudentName] = useState('');
-  const [editProgram, setEditProgram] = useState('');
-  const [editAdmissionYear, setEditAdmissionYear] = useState('');
-  const [editSemesterType, setEditSemesterType] = useState<'Autumn' | 'Spring'>('Autumn');
+  // Filter out soft-deleted records
+  const validStudents = studentRecords.filter(s => !s.isDeleted);
 
-  // Edit Course Code Modal state
-  const [showCourseModal, setShowCourseModal] = useState(false);
-  const [courseModalType, setCourseModalType] = useState<'add' | 'edit'>('add');
-  const [activeSemesterNum, setActiveSemesterNum] = useState<number>(1);
-  const [activeCourseIndex, setActiveCourseIndex] = useState<number>(-1);
-  const [courseCodeInput, setCourseCodeInput] = useState('');
-
-  // Synchronize local selectedStudent state if the parent's records change
-  useEffect(() => {
-    if (selectedStudentId) {
-      const updated = studentRecords.find(r => r.id === selectedStudentId);
-      if (updated) {
-        setSelectedStudent(JSON.parse(JSON.stringify(updated))); // deep copy to allow local draft modifications
-      } else {
-        setSelectedStudent(null);
-        setSelectedStudentId('');
-      }
-    } else {
-      setSelectedStudent(null);
-    }
-  }, [studentRecords, selectedStudentId]);
-
-  // Handle Select Student
-  const handleSelectStudent = (student: StudentRecord) => {
-    setSelectedStudentId(student.id);
-    setSelectedStudent(JSON.parse(JSON.stringify(student))); // deep copy
-  };
-
-  // Toast Notification
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  // Filter student directory records
-  const filteredStudents = studentRecords.filter(student => {
+  // Filter and Search logic for student look-up
+  const filteredStudents = validStudents.filter(student => {
     const query = searchQuery.toLowerCase().trim();
+    
+    // Check program filter
+    if (selectedProgramFilter !== 'All' && student.programSelected !== selectedProgramFilter) {
+      return false;
+    }
+
     if (!query) return true;
-    return (
+
+    // Search by name, ID, program or any enrolled course code
+    const matchesProfile = (
       student.studentName.toLowerCase().includes(query) ||
       student.registrationId.toLowerCase().includes(query) ||
-      student.programSelected.toLowerCase().includes(query) ||
-      (student.phoneNumber && student.phoneNumber.includes(query))
+      student.programSelected.toLowerCase().includes(query)
     );
+
+    if (matchesProfile) return true;
+
+    const matchesCourseCode = student.semesters?.some(sem => 
+      sem.courses?.some(course => course.code.toLowerCase().includes(query))
+    );
+
+    return matchesCourseCode;
   }).sort((a, b) => a.studentName.localeCompare(b.studentName));
 
-  // Save updated student record back to cloud & local storage
-  const saveUpdatedStudentRecord = async (updatedRecord: StudentRecord) => {
-    setIsSaving(true);
-    try {
-      updatedRecord.updatedAt = new Date().toISOString();
-      await onUpdateStudent(updatedRecord);
-      triggerToast('Student semester course codes updated successfully!');
-    } catch (error) {
-      console.error('Error saving student course records:', error);
-      triggerToast('Failed to update records. Placed in local sync buffer.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // Extract unique academic programs for filter dropdown
+  const programs = Array.from(
+    new Set(validStudents.map(s => s.programSelected))
+  ).filter(Boolean).sort();
 
-  // Open Edit Student Info
-  const handleOpenStudentInfoEdit = () => {
-    if (!selectedStudent) return;
-    setEditStudentName(selectedStudent.studentName);
-    setEditProgram(selectedStudent.programSelected);
-    setEditAdmissionYear(selectedStudent.admissionYear);
-    setEditSemesterType(selectedStudent.semesterType || 'Autumn');
-    setShowStudentInfoModal(true);
-  };
-
-  // Save Student Info Edit
-  const handleSaveStudentInfo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudent) return;
-
-    const updated = {
-      ...selectedStudent,
-      studentName: editStudentName.trim(),
-      programSelected: editProgram,
-      admissionYear: editAdmissionYear.trim(),
-      semesterType: editSemesterType,
-    };
-
-    setSelectedStudent(updated);
-    setShowStudentInfoModal(false);
-    await saveUpdatedStudentRecord(updated);
-  };
-
-  // Open Add Course Code Modal
-  const handleOpenAddCourse = (semesterNum: number) => {
-    setCourseModalType('add');
-    setActiveSemesterNum(semesterNum);
-    setCourseCodeInput('');
-    setShowCourseModal(true);
-  };
-
-  // Open Edit Course Code Modal
-  const handleOpenEditCourse = (semesterNum: number, courseIdx: number, currentCode: string) => {
-    setCourseModalType('edit');
-    setActiveSemesterNum(semesterNum);
-    setActiveCourseIndex(courseIdx);
-    setCourseCodeInput(currentCode);
-    setShowCourseModal(true);
-  };
-
-  // Save Course Code (Add/Edit)
-  const handleSaveCourseCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudent) return;
-    const trimmedCode = courseCodeInput.trim().toUpperCase();
-    if (!trimmedCode) return;
-
-    const updated = { ...selectedStudent };
-    
-    // Find semester
-    const semIdx = updated.semesters.findIndex(s => s.semesterNumber === activeSemesterNum);
-    if (semIdx !== -1) {
-      if (courseModalType === 'add') {
-        // Initialize courses array if it doesn't exist
-        if (!updated.semesters[semIdx].courses) {
-          updated.semesters[semIdx].courses = [];
-        }
-        
-        // Add course
-        const newCourse: CourseData = {
-          code: trimmedCode,
-          assignment: false,
-          workshop: false,
-          quiz: false,
-          assignment1: false,
-          assignment2: false
-        };
-        updated.semesters[semIdx].courses.push(newCourse);
-      } else {
-        // Edit course
-        if (updated.semesters[semIdx].courses && updated.semesters[semIdx].courses[activeCourseIndex]) {
-          updated.semesters[semIdx].courses[activeCourseIndex].code = trimmedCode;
-        }
-      }
-    }
-
-    setSelectedStudent(updated);
-    setShowCourseModal(false);
-    await saveUpdatedStudentRecord(updated);
-  };
-
-  // Delete Course Code
-  const handleDeleteCourseCode = async (semesterNum: number, courseIdx: number) => {
-    if (!selectedStudent) return;
-    if (!window.confirm('Are you sure you want to delete this course code?')) return;
-
-    const updated = { ...selectedStudent };
-    const semIdx = updated.semesters.findIndex(s => s.semesterNumber === semesterNum);
-    
-    if (semIdx !== -1 && updated.semesters[semIdx].courses) {
-      updated.semesters[semIdx].courses.splice(courseIdx, 1);
-      setSelectedStudent(updated);
-      await saveUpdatedStudentRecord(updated);
-    }
-  };
-
-  // Add New Semester
-  const handleAddNewSemester = async () => {
-    if (!selectedStudent) return;
-    
-    const updated = { ...selectedStudent };
-    const nextSemesterNumber = updated.semesters.length > 0 
-      ? Math.max(...updated.semesters.map(s => s.semesterNumber)) + 1 
-      : 1;
-
-    const newSemester: SemesterData = {
-      semesterNumber: nextSemesterNumber,
-      courses: []
-    };
-
-    updated.semesters.push(newSemester);
-    setSelectedStudent(updated);
-    await saveUpdatedStudentRecord(updated);
-    triggerToast(`Semester ${nextSemesterNumber} added successfully!`);
-  };
-
-  // Remove Entire Semester
-  const handleRemoveSemester = async (semesterNum: number) => {
-    if (!selectedStudent) return;
-    if (!window.confirm(`Are you sure you want to remove Semester ${semesterNum} and all its course codes?`)) return;
-
-    const updated = { ...selectedStudent };
-    updated.semesters = updated.semesters.filter(s => s.semesterNumber !== semesterNum);
-    
-    // Re-index semester numbers to keep them consistent
-    updated.semesters = updated.semesters.map((s, index) => ({
-      ...s,
-      semesterNumber: index + 1
-    }));
-
-    setSelectedStudent(updated);
-    await saveUpdatedStudentRecord(updated);
-    triggerToast(`Semester ${semesterNum} removed successfully.`);
-  };
+  // Selected student details lookup
+  const selectedStudent = validStudents.find(s => s.id === selectedStudentId) || null;
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 space-y-8">
+    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 space-y-6">
       
-      {/* 1. Header with Title and back navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+      {/* 1. Header with Title and Back Navigation */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
         <div className="flex items-center gap-3">
           <button
-            onClick={onBackToDashboard}
+            onClick={selectedStudentId ? () => setSelectedStudentId(null) : onBackToDashboard}
+            id="semester-courses-back-btn"
             className={`p-2 rounded-xl border border-gray-200 bg-white shadow-3xs cursor-pointer hover:bg-gray-50 transition-colors ${
               isGreen ? 'text-emerald-700 hover:text-emerald-900' : 'text-sky-700 hover:text-sky-900'
             }`}
@@ -272,498 +92,269 @@ export default function SemesterCourseCodesModule({
             <h2 className={`text-xl md:text-2xl font-black tracking-tight flex items-center gap-2 ${
               isGreen ? 'text-emerald-950' : 'text-sky-950'
             }`}>
-              <BookOpenCheck size={22} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
-              <span>Semester-wise Course Codes Dashboard</span>
+              <BookOpenCheck size={24} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
+              <span>Semester Course Codes Directory</span>
             </h2>
-            <p className="text-gray-500 text-xs mt-0.5">
-              Review and manage academic course code distributions, update semester configurations, or append semesters dynamically.
+            <p className="text-gray-500 text-xs mt-1">
+              {selectedStudentId 
+                ? "Detailed semester-wise academic course schedule view (Read-Only)."
+                : "Search and filter to audit a specific student's registered course codes."}
             </p>
           </div>
         </div>
 
-        {selectedStudent && (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-400 font-mono">
-              Editing: <strong className="text-gray-700">{selectedStudent.studentName}</strong>
+        {/* Counter Badge */}
+        {!selectedStudentId && (
+          <div className={`self-start md:self-center px-4 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 ${
+            isGreen 
+              ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' 
+              : 'bg-sky-50/50 border-sky-100 text-sky-800'
+          }`}>
+            <span>Total Enrolled:</span>
+            <span className={`px-2 py-0.5 rounded-md font-mono text-xs ${
+              isGreen ? 'bg-emerald-100 text-emerald-950' : 'bg-sky-100 text-sky-950'
+            }`}>
+              {filteredStudents.length}
             </span>
-            {isSaving && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse ${
-                isGreen ? 'bg-emerald-50 text-emerald-800' : 'bg-sky-50 text-sky-800'
-              }`}>
-                Saving changes...
-              </span>
-            )}
           </div>
         )}
       </div>
 
-      {/* 2. Main content split layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left Side: Student Directory (4 cols) */}
-        <div className="lg:col-span-4 bg-white p-4 rounded-2xl border border-gray-150 shadow-3xs space-y-4">
-          <div className="space-y-1">
-            <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-              <User size={13} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
-              <span>Student Roster Directory</span>
-            </h3>
-            <p className="text-[10px] text-gray-400 leading-tight">
-              Select any enrolled student from the roster below to audit and customize their semester course codes.
-            </p>
-          </div>
-
-          {/* Search bar inside sidebar */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-              <Search size={14} />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, ID or program..."
-              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50/20 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-sans"
-            />
-          </div>
-
-          {/* Students list */}
-          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1 divide-y divide-gray-100">
-            {filteredStudents.length === 0 ? (
-              <div className="p-8 text-center text-xs text-gray-400 italic">
-                No students found matching your search.
+      <AnimatePresence mode="wait">
+        {!selectedStudentId ? (
+          /* ==================== VIEW A: LOOK-UP DIRECTORY (NO COURSE CODES DISPLAYED TOGETHER) ==================== */
+          <motion.div
+            key="directory-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            {/* Search & Filtering Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-3xs flex flex-col sm:flex-row gap-4 items-center justify-between">
+              
+              {/* Search input */}
+              <div className="relative w-full sm:max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                  <Search size={15} />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search student by name, registration ID, or program..."
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl text-xs bg-gray-50/20 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-sans"
+                />
               </div>
-            ) : (
-              filteredStudents.map((student) => {
-                const isSelected = selectedStudentId === student.id;
-                const totalSems = student.semesters?.length || 0;
-                const totalCoursesCount = student.semesters?.reduce((sum, s) => sum + (s.courses?.length || 0), 0) || 0;
-                
-                return (
-                  <div
-                    key={student.id}
-                    onClick={() => handleSelectStudent(student)}
-                    className={`p-3 rounded-xl flex items-center justify-between cursor-pointer transition-all duration-150 group pt-3 ${
-                      isSelected 
-                        ? isGreen 
-                          ? 'bg-emerald-50/80 border border-emerald-200 text-emerald-950 shadow-4xs' 
-                          : 'bg-sky-50/80 border border-sky-200 text-sky-950 shadow-4xs'
-                        : 'hover:bg-gray-50/60 border border-transparent text-gray-800'
-                    }`}
-                  >
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-xs truncate block">
-                          {student.studentName}
-                        </span>
-                        <span className={`text-[8px] px-1 py-0.2 rounded-sm font-mono font-bold ${
-                          student.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {student.status}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-gray-400 truncate font-medium">
-                        {student.programSelected}
-                      </div>
-                      <div className="flex items-center gap-2 text-[9px] text-gray-400 font-mono">
-                        <span>ID: <strong className="text-gray-600">{student.registrationId}</strong></span>
-                        <span>•</span>
-                        <span>{totalSems} Sems ({totalCoursesCount} Courses)</span>
-                      </div>
-                    </div>
-                    
-                    <ChevronRight 
-                      size={14} 
-                      className={`shrink-0 transition-transform ${
-                        isSelected 
-                          ? 'transform translate-x-1 text-emerald-600' 
-                          : 'text-gray-300 group-hover:text-gray-400'
-                      }`} 
-                    />
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
 
-        {/* Right Side: Semester Course Codes Audit and Control panel (8 cols) */}
-        <div className="lg:col-span-8 space-y-6">
-          <AnimatePresence mode="wait">
-            {!selectedStudent ? (
-              <motion.div
-                key="empty-state"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-white p-12 rounded-2xl border border-gray-150 shadow-3xs text-center flex flex-col items-center justify-center space-y-4"
-              >
-                <div className={`p-4 rounded-2xl ${isGreen ? 'bg-emerald-50 text-emerald-500' : 'bg-sky-50 text-sky-500'} animate-pulse`}>
-                  <BookOpen size={48} />
-                </div>
-                <div className="max-w-sm space-y-1.5">
-                  <h3 className="text-base font-extrabold text-gray-900">
-                    No Enrolled Student Selected
-                  </h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    Choose a student from the directory roster on the left sidebar to access their course schedule timeline, modify course codes, and audit semester logs.
-                  </p>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="student-courses-panel"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-6"
-              >
-                
-                {/* 1. Student Info Header Display Panel */}
-                <div className={`p-5 rounded-2xl border text-white shadow-2xs relative overflow-hidden ${
-                  isGreen 
-                    ? 'bg-gradient-to-r from-emerald-800 to-teal-900 border-emerald-950' 
-                    : 'bg-gradient-to-r from-sky-800 to-indigo-900 border-sky-950'
-                }`}>
-                  {/* Decorative background visual */}
-                  <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none flex items-center justify-center mr-6">
-                    <BookMarked size={120} />
-                  </div>
+              {/* Program dropdown filter */}
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <Filter size={14} className="text-gray-400" />
+                <select
+                  value={selectedProgramFilter}
+                  onChange={(e) => setSelectedProgramFilter(e.target.value)}
+                  className="w-full sm:w-56 p-2 border border-gray-300 rounded-xl text-xs bg-white text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                >
+                  <option value="All">All Academic Programs</option>
+                  {programs.map(prog => (
+                    <option key={prog} value={prog}>{prog}</option>
+                  ))}
+                </select>
+              </div>
 
-                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded">
-                          {selectedStudent.registrationId}
-                        </span>
-                        <span className="text-[10px] font-mono text-white/80">
-                          Enrolled: {selectedStudent.admissionYear} ({selectedStudent.semesterType || 'Autumn'})
-                        </span>
-                      </div>
-                      <h3 className="text-xl font-black tracking-tight text-white">
-                        {selectedStudent.studentName}
-                      </h3>
-                      <p className="text-xs text-white/80 font-medium">
-                        {selectedStudent.programSelected}
-                      </p>
-                    </div>
+            </div>
 
-                    <button
-                      onClick={handleOpenStudentInfoEdit}
-                      className="self-start sm:self-center bg-white/10 hover:bg-white/25 border border-white/20 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Edit size={12} />
-                      <span>Edit Student Info</span>
-                    </button>
+            {/* List of Student Lookup Cards (Strictly basic profile details, no course codes) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredStudents.length === 0 ? (
+                <div className="col-span-1 md:col-span-2 bg-white p-12 rounded-2xl border border-gray-150 text-center text-xs text-gray-400 italic">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <BookOpen size={36} className="text-gray-300 animate-pulse" />
+                    <span>No student records match your active filters or search terms.</span>
                   </div>
                 </div>
-
-                {/* 2. Semesters Course Cards Grid */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-extrabold text-gray-500 uppercase tracking-widest font-mono">
-                      Semester-wise Course Code Distribution
-                    </h3>
-                    <button
-                      onClick={handleAddNewSemester}
-                      className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer bg-white ${
-                        isGreen 
-                          ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' 
-                          : 'border-sky-200 text-sky-700 hover:bg-sky-50'
+              ) : (
+                filteredStudents.map((student) => {
+                  const semesterCount = student.semesters?.length || 0;
+                  return (
+                    <div 
+                      key={student.id}
+                      onClick={() => setSelectedStudentId(student.id)}
+                      className={`bg-white rounded-2xl border border-gray-150 p-5 shadow-3xs hover:shadow-2xs transition-all cursor-pointer group flex flex-col justify-between border-l-4 ${
+                        isGreen ? 'hover:border-emerald-500 border-l-emerald-600' : 'hover:border-sky-500 border-l-sky-600'
                       }`}
                     >
-                      <Plus size={13} />
-                      <span>Add Semester</span>
-                    </button>
-                  </div>
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-extrabold text-sm text-gray-900 group-hover:text-emerald-950 transition-colors">
+                            {student.studentName}
+                          </span>
+                          <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            student.status === 'active' 
+                              ? 'bg-green-100 text-green-850' 
+                              : 'bg-amber-100 text-amber-850'
+                          }`}>
+                            {student.status || 'Active'}
+                          </span>
+                        </div>
 
-                  {selectedStudent.semesters && selectedStudent.semesters.length === 0 ? (
-                    <div className="bg-white p-8 rounded-2xl border border-gray-150 text-center text-xs text-gray-400 italic">
-                      This student has no semesters registered. Click "Add Semester" to create one.
+                        <div className="space-y-1 text-xs text-gray-500">
+                          <p className="flex items-center gap-1.5 font-medium">
+                            <GraduationCap size={13} className="text-gray-400 shrink-0" />
+                            <span className="truncate">{student.programSelected}</span>
+                          </p>
+                          <p className="flex items-center gap-1.5 font-mono text-[10px] text-gray-400">
+                            <span>ID: <strong className="text-gray-650 font-bold">{student.registrationId}</strong></span>
+                            <span>•</span>
+                            <span>Intake: <strong className="text-gray-650 font-bold">{student.admissionYear} ({student.semesterType || 'Autumn'})</strong></span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          {semesterCount} Registered {semesterCount === 1 ? 'Semester' : 'Semesters'}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold transition-colors ${
+                          isGreen ? 'text-emerald-700 group-hover:text-emerald-900' : 'text-sky-700 group-hover:text-sky-900'
+                        }`}>
+                          <span>View Course Codes</span>
+                          <ChevronRight size={13} className="transform group-hover:translate-x-0.5 transition-transform" />
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedStudent.semesters
-                        ?.sort((a, b) => a.semesterNumber - b.semesterNumber)
-                        .map((sem) => {
-                          const courseCount = sem.courses?.length || 0;
-                          return (
-                            <div 
-                              key={sem.semesterNumber}
-                              className={`bg-white rounded-2xl border border-gray-150 shadow-3xs hover:shadow-2xs transition-all flex flex-col justify-between overflow-hidden border-t-4 ${
-                                isGreen ? 'hover:border-emerald-500 border-t-emerald-600' : 'hover:border-sky-500 border-t-sky-600'
-                              }`}
-                            >
-                              {/* Card Header */}
-                              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  <div className={`p-1.5 rounded-lg text-xs font-bold font-mono ${
-                                    isGreen ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'
-                                  }`}>
-                                    S-{sem.semesterNumber}
-                                  </div>
-                                  <span className="font-extrabold text-xs text-gray-800">
-                                    Semester {sem.semesterNumber}
-                                  </span>
-                                  <span className="text-[10px] text-gray-400">
-                                    ({courseCount} {courseCount === 1 ? 'course' : 'courses'})
-                                  </span>
-                                </div>
-
-                                <button
-                                  onClick={() => handleRemoveSemester(sem.semesterNumber)}
-                                  title="Remove entire semester"
-                                  className="p-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-
-                              {/* Card Body Courses list */}
-                              <div className="p-4 flex-1 space-y-2 min-h-[140px] bg-gray-50/20">
-                                {!sem.courses || sem.courses.length === 0 ? (
-                                  <div className="text-center py-8 text-[11px] text-gray-400 italic font-medium">
-                                    No course codes assigned
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-wrap gap-2">
-                                    {sem.courses.map((course, idx) => (
-                                      <div 
-                                        key={idx}
-                                        className="bg-white border border-gray-200 pl-2.5 pr-1.5 py-1 rounded-lg flex items-center gap-1.5 shadow-4xs group/badge"
-                                      >
-                                        <span className="font-mono text-[11px] font-extrabold text-gray-900 tracking-wider">
-                                          {course.code || 'UNNAMED'}
-                                        </span>
-                                        <div className="flex items-center gap-0.5 opacity-60 group-hover/badge:opacity-100 transition-opacity">
-                                          <button
-                                            onClick={() => handleOpenEditCourse(sem.semesterNumber, idx, course.code)}
-                                            className="p-0.5 text-gray-400 hover:text-emerald-600 hover:bg-gray-100 rounded cursor-pointer"
-                                            title="Edit code"
-                                          >
-                                            <Edit size={10} />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteCourseCode(sem.semesterNumber, idx)}
-                                            className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded cursor-pointer"
-                                            title="Delete code"
-                                          >
-                                            <Trash2 size={10} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Card Footer */}
-                              <div className="p-3 bg-gray-50 border-t border-gray-100 flex justify-end">
-                                <button
-                                  onClick={() => handleOpenAddCourse(sem.semesterNumber)}
-                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border bg-white cursor-pointer transition-colors ${
-                                    isGreen 
-                                      ? 'border-emerald-150 text-emerald-700 hover:bg-emerald-50' 
-                                      : 'border-sky-150 text-sky-700 hover:bg-sky-50'
-                                  }`}
-                                >
-                                  <Plus size={11} />
-                                  <span>Add Course</span>
-                                </button>
-                              </div>
-
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-                </div>
-
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-      </div>
-
-      {/* 3. MODAL: Edit Student Info */}
-      <AnimatePresence>
-        {showStudentInfoModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full overflow-hidden"
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        ) : (
+          /* ==================== VIEW B: INDIVIDUAL SINGLE STUDENT DETAILS (READ-ONLY) ==================== */
+          <motion.div
+            key="details-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            
+            {/* Back Button to Roster lookup */}
+            <button
+              onClick={() => setSelectedStudentId(null)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-800 bg-white border border-gray-200 px-3.5 py-2 rounded-xl shadow-4xs cursor-pointer transition-all hover:bg-gray-50"
             >
-              <div className="p-5 border-b border-gray-150 flex items-center justify-between">
-                <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
-                  <Edit size={15} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
-                  <span>Modify Semester & General Info</span>
-                </h3>
-                <button
-                  onClick={() => setShowStudentInfoModal(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
+              <ArrowLeft size={13} />
+              <span>Back to Student Roster</span>
+            </button>
+
+            {/* Profile Brief Banner Card */}
+            <div className={`p-6 rounded-2xl border text-white shadow-2xs relative overflow-hidden ${
+              isGreen 
+                ? 'bg-gradient-to-r from-emerald-800 to-teal-900 border-emerald-950' 
+                : 'bg-gradient-to-r from-sky-800 to-indigo-900 border-sky-950'
+            }`}>
+              <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none flex items-center justify-center mr-8">
+                <BookMarked size={120} />
               </div>
 
-              <form onSubmit={handleSaveStudentInfo} className="p-5 space-y-4">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Student Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editStudentName}
-                    onChange={(e) => setEditStudentName(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-xs"
-                    placeholder="e.g. Ahmad Khan"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Academic Program *</label>
-                  <select
-                    value={editProgram}
-                    onChange={(e) => setEditProgram(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-xs"
-                  >
-                    {PROGRAM_OPTIONS.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-extrabold text-gray-550">Admission Year *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editAdmissionYear}
-                      onChange={(e) => setEditAdmissionYear(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs font-mono"
-                      placeholder="e.g. 2026"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-extrabold text-gray-550">Admission Semester *</label>
-                    <select
-                      value={editSemesterType}
-                      onChange={(e) => setEditSemesterType(e.target.value as any)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs"
-                    >
-                      <option value="Autumn">Autumn</option>
-                      <option value="Spring">Spring</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-gray-150 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowStudentInfoModal(false)}
-                    className="text-xs font-bold text-gray-500 hover:text-gray-700 px-4 py-2 hover:bg-gray-50 rounded-lg transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-bold text-white shadow-xs cursor-pointer transition-all ${
-                      isGreen 
-                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' 
-                        : 'bg-sky-600 hover:bg-sky-700 shadow-sky-200'
-                    }`}
-                  >
-                    <Save size={13} />
-                    <span>{isSaving ? 'Saving...' : 'Save Student Info'}</span>
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* 4. MODAL: Add/Edit Course Code */}
-      <AnimatePresence>
-        {showCourseModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-sm w-full overflow-hidden"
-            >
-              <div className="p-5 border-b border-gray-150 flex items-center justify-between">
-                <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
-                  <Hash size={15} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
-                  <span>
-                    {courseModalType === 'add' ? `Add Course to Semester ${activeSemesterNum}` : `Edit Course Code (Semester ${activeSemesterNum})`}
+              <div className="relative z-10 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded font-mono">
+                    ID: {selectedStudent?.registrationId}
                   </span>
+                  <span className="text-[10px] font-medium text-white/80">
+                    Status: {selectedStudent?.status || 'Active'}
+                  </span>
+                </div>
+                <h3 className="text-xl md:text-2xl font-black tracking-tight text-white">
+                  {selectedStudent?.studentName}
                 </h3>
-                <button
-                  onClick={() => setShowCourseModal(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveCourseCode} className="p-5 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Course Code *</label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={courseCodeInput}
-                    onChange={(e) => setCourseCodeInput(e.target.value)}
-                    placeholder="e.g. 8601"
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-xs font-mono font-bold tracking-widest uppercase"
-                  />
-                  <p className="text-[10px] text-gray-400 leading-tight">
-                    Course codes should be entered as alphanumeric identifiers matching AIOU prospectus.
+                
+                <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-white/90 font-medium">
+                  <p className="flex items-center gap-1.5">
+                    <GraduationCap size={14} className="opacity-80" />
+                    <span>{selectedStudent?.programSelected}</span>
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <Calendar size={14} className="opacity-80" />
+                    <span>Admission Year: {selectedStudent?.admissionYear} ({selectedStudent?.semesterType || 'Autumn'} Intake)</span>
                   </p>
                 </div>
+              </div>
+            </div>
 
-                <div className="pt-3 border-t border-gray-150 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowCourseModal(false)}
-                    className="text-xs font-bold text-gray-500 hover:text-gray-700 px-4 py-2 hover:bg-gray-50 rounded-lg transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-bold text-white shadow-xs cursor-pointer transition-all ${
-                      isGreen 
-                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' 
-                        : 'bg-sky-600 hover:bg-sky-700 shadow-sky-200'
-                    }`}
-                  >
-                    <Save size={13} />
-                    <span>{isSaving ? 'Saving...' : 'Save Course'}</span>
-                  </button>
+            {/* Read-Only Semester Grid Layout */}
+            <div className="bg-white rounded-2xl border border-gray-150 shadow-3xs overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex items-center gap-2">
+                <Layers size={14} className={isGreen ? 'text-emerald-600' : 'text-sky-600'} />
+                <h4 className="text-xs font-extrabold text-gray-700 uppercase tracking-widest font-mono">
+                  Enrolled Semester Course Codes Distribution
+                </h4>
+              </div>
+
+              {!selectedStudent?.semesters || selectedStudent.semesters.length === 0 ? (
+                <div className="p-12 text-center text-xs text-gray-400 italic">
+                  No registered semester schedules are currently available for this student.
                 </div>
-              </form>
-            </motion.div>
-          </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {selectedStudent.semesters
+                    .sort((a, b) => a.semesterNumber - b.semesterNumber)
+                    .map((sem) => {
+                      const coursesList = sem.courses || [];
+                      return (
+                        <div 
+                          key={sem.semesterNumber} 
+                          className="p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-gray-50/30 transition-colors"
+                        >
+                          {/* Semester Number Tag */}
+                          <div className="sm:w-36 shrink-0 flex items-center gap-2">
+                            <span className={`text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-md border ${
+                              isGreen 
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-100' 
+                                : 'bg-sky-50 text-sky-800 border-sky-100'
+                            }`}>
+                              S-{sem.semesterNumber}
+                            </span>
+                            <span className="text-xs font-black text-gray-800">
+                              Semester {sem.semesterNumber}
+                            </span>
+                          </div>
+
+                          {/* Course list tags Column */}
+                          <div className="flex-1">
+                            {coursesList.length === 0 ? (
+                              <span className="text-xs text-gray-400 italic">No courses enrolled in this semester</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {coursesList.map((course, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center bg-gray-55/40 border border-gray-200 text-gray-800 font-mono font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-4xs"
+                                    title="Enrolled course code (read-only)"
+                                  >
+                                    {course.code}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Note */}
+            <div className="flex items-center gap-2 justify-center text-[11px] text-gray-400 font-medium">
+              <Sparkles size={12} className={isGreen ? 'text-emerald-500' : 'text-sky-500'} />
+              <span>All records synchronized directly with database. No modify access granted in this directory.</span>
+            </div>
+
+          </motion.div>
         )}
       </AnimatePresence>
-
-      {/* 5. Floating toast notification */}
-      {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-gray-950/95 backdrop-blur-md text-white font-extrabold text-xs px-5 py-3 rounded-2xl border border-gray-800 shadow-xl flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 size={14} className="text-emerald-500" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
     </div>
   );
