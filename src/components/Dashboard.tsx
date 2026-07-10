@@ -14,7 +14,8 @@ import {
   Search,
   ArrowRight,
   Award,
-  Bell
+  Bell,
+  BookOpenCheck
 } from 'lucide-react';
 import { StudentRecord } from '../types';
 
@@ -24,6 +25,7 @@ interface DashboardProps {
   onSelectExamRecords: () => void;
   onSelectDegreeMgt: () => void;
   onSelectQuizMgt: () => void;
+  onSelectSemesterCourses: () => void;
   theme: 'green' | 'blue';
   stats: {
     totalStudents: number;
@@ -40,6 +42,7 @@ export default function Dashboard({
   onSelectExamRecords,
   onSelectDegreeMgt,
   onSelectQuizMgt,
+  onSelectSemesterCourses,
   theme,
   stats,
   records,
@@ -214,7 +217,7 @@ export default function Dashboard({
       </div>
 
       {/* Main Call to Action Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         {/* Enroll Card */}
         <button
           onClick={onSelectEnroll}
@@ -327,6 +330,29 @@ export default function Dashboard({
           </h3>
           <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
             Monitor dynamic quiz schedules of all students, schedule course paper dates, set timely alarm alerts, and send SMS/WhatsApp reminders.
+          </p>
+        </button>
+
+        {/* Semester-wise Course Codes */}
+        <button
+          onClick={onSelectSemesterCourses}
+          id="dashboard-semester-courses-button"
+          className={`flex flex-col items-center md:items-start md:text-left p-6 bg-white border rounded-2xl cursor-pointer group hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${
+            isGreen
+              ? 'border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/10'
+              : 'border-sky-100 hover:border-sky-300 hover:bg-sky-50/10'
+          }`}
+        >
+          <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
+            isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
+          }`}>
+            <BookOpenCheck size={28} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 group-hover:text-teal-700 transition-colors">
+            Semester Course Codes
+          </h3>
+          <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
+            Fetch student program admissions, monitor course codes semester-by-semester, append academic semesters, and edit student courses.
           </p>
         </button>
       </div>
