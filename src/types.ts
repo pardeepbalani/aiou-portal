@@ -206,4 +206,29 @@ export interface StudentQuizRecord {
   updatedAt: string;
 }
 
+export interface TutorshipCourse {
+  courseName: string;
+  courseCode: string;
+  totalCandidates: number;
+  assignment1Candidates: number;
+  assignment2Candidates: number;
+  assignment3Candidates?: number;
+  assignment4Candidates?: number;
+  gradingStatus: 'Completed' | 'Pending';
+  finalGradingDueDate: string;
+  paymentDue: number;
+}
+
+export interface TutorshipRecord {
+  id: string;
+  semesterTerm: string; // e.g. "Autumn 2025"
+  program: string; // e.g. "BA Program"
+  courses: TutorshipCourse[];
+  totalPaymentReceived: number;
+  paymentReceivedDate?: string;
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 

@@ -11,7 +11,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, TutorshipRecord } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -881,6 +881,122 @@ export async function deleteStudentQuizRecord(id: string): Promise<void> {
     setQuotaExceeded(false); // Self-healing
   } catch (error) {
     console.error('Firestore delete failed for Student Quiz Record:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+// ==========================================
+// TUTORSHIP RECORDS LOGIC
+// ==========================================
+const TUTORSHIP_RECORDS_COLLECTION = 'tutorship_records';
+const LOCAL_TUTORSHIP_RECORDS_KEY = 'aiou_local_tutorship_records';
+
+export function getLocalTutorshipRecords(): TutorshipRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_TUTORSHIP_RECORDS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(TUTORSHIP_RECORDS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local tutorship records:', error);
+    return [];
+  }
+}
+
+export function saveLocalTutorshipRecords(records: TutorshipRecord[]): void {
+  try {
+    const deletedIds = getDeletedIds(TUTORSHIP_RECORDS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_TUTORSHIP_RECORDS_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local tutorship records:', error);
+  }
+}
+
+export async function saveTutorshipRecord(record: TutorshipRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord: TutorshipRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  const local = getLocalTutorshipRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalTutorshipRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, TUTORSHIP_RECORDS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.warn('Firestore write failed for Tutorship Record, using local fallback. Error:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncTutorshipRecords(): Promise<TutorshipRecord[]> {
+  const deletedIds = getDeletedIds(TUTORSHIP_RECORDS_COLLECTION);
+  let remoteRecords: TutorshipRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, TUTORSHIP_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as TutorshipRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Tutorship Records. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalTutorshipRecords();
+  }
+
+  const local = getLocalTutorshipRecords();
+  const mergedMap = new Map<string, TutorshipRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalTutorshipRecords(merged);
+  return merged;
+}
+
+export async function deleteTutorshipRecord(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(TUTORSHIP_RECORDS_COLLECTION, id);
+
+  const local = getLocalTutorshipRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalTutorshipRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, TUTORSHIP_RECORDS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.error('Firestore delete failed for Tutorship Record:', error);
     setQuotaExceeded(true);
   }
 }
