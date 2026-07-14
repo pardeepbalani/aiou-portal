@@ -205,6 +205,18 @@ export function addDeletedId(collectionName: string, id: string) {
   }
 }
 
+export function removeDeletedId(collectionName: string, id: string) {
+  try {
+    const ids = getDeletedIds(collectionName);
+    if (ids.includes(id)) {
+      const updated = ids.filter(x => x !== id);
+      localStorage.setItem(DELETED_IDS_PREFIX + collectionName, JSON.stringify(updated));
+    }
+  } catch (e) {
+    console.error('Failed to remove deleted ID:', e);
+  }
+}
+
 /**
  * Get all records from local storage.
  */
@@ -260,6 +272,9 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
     updatedAt: now,
     createdAt: record.createdAt || now
   };
+
+  // Remove from deleted tracking if present
+  removeDeletedId(COLLECTION_NAME, updatedRecord.id);
 
   // 1. Save locally first (immediate offline feedback)
   const localRecords = getLocalRecords(true);
@@ -491,6 +506,9 @@ export async function saveExamManager(manager: ExamManager): Promise<void> {
     createdAt: manager.createdAt || now
   };
 
+  // Remove from deleted tracking if present
+  removeDeletedId(EXAM_MANAGERS_COLLECTION, updatedManager.id);
+
   const local = getLocalExamManagers();
   const index = local.findIndex(m => m.id === updatedManager.id);
   if (index >= 0) {
@@ -578,6 +596,9 @@ export async function saveStudentExamInfo(record: StudentExamInfo): Promise<void
     updatedAt: now,
     createdAt: record.createdAt || now
   };
+
+  // Remove from deleted tracking if present
+  removeDeletedId(EXAM_RECORDS_COLLECTION, updatedRecord.id);
 
   const local = getLocalExamRecords();
   const index = local.findIndex(r => r.id === updatedRecord.id);
@@ -692,6 +713,9 @@ export async function saveStudentDegreeRecord(record: StudentDegreeRecord): Prom
     createdAt: record.createdAt || now
   };
 
+  // Remove from deleted tracking if present
+  removeDeletedId(DEGREE_RECORDS_COLLECTION, updatedRecord.id);
+
   const local = getLocalDegreeRecords();
   const index = local.findIndex(r => r.id === updatedRecord.id);
   if (index >= 0) {
@@ -804,6 +828,9 @@ export async function saveStudentQuizRecord(record: StudentQuizRecord): Promise<
     updatedAt: now,
     createdAt: record.createdAt || now
   };
+
+  // Remove from deleted tracking if present
+  removeDeletedId(QUIZ_RECORDS_COLLECTION, updatedRecord.id);
 
   const local = getLocalQuizRecords();
   const index = local.findIndex(r => r.id === updatedRecord.id);
@@ -920,6 +947,9 @@ export async function saveTutorshipRecord(record: TutorshipRecord): Promise<void
     updatedAt: now,
     createdAt: record.createdAt || now
   };
+
+  // Remove from deleted tracking if present
+  removeDeletedId(TUTORSHIP_RECORDS_COLLECTION, updatedRecord.id);
 
   const local = getLocalTutorshipRecords();
   const index = local.findIndex(r => r.id === updatedRecord.id);

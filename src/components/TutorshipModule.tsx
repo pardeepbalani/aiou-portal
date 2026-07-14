@@ -200,11 +200,21 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
 
     const id = `${newSemesterTerm.replace(/\s+/g, '_').toLowerCase()}_${newProgram.replace(/\s+/g, '_').toLowerCase()}`;
     
-    // Check if duplicate
-    const existing = records.find(r => r.semesterTerm === newSemesterTerm && r.program === newProgram);
+    // Find old record if we are editing
+    const oldRecord = editingRecordId ? records.find(r => r.id === editingRecordId) : null;
     
-    const recordToSave: TutorshipRecord = existing ? {
-      ...existing,
+    // Check if duplicate with a different record
+    const existing = records.find(r => r.semesterTerm === newSemesterTerm && r.program === newProgram && r.id !== editingRecordId);
+    if (existing) {
+      alert(`A tutorship record for ${newSemesterTerm} under ${newProgram} already exists!`);
+      return;
+    }
+
+    const recordToSave: TutorshipRecord = oldRecord ? {
+      ...oldRecord,
+      id,
+      semesterTerm: newSemesterTerm,
+      program: newProgram,
       totalPaymentReceived: Number(semesterPaymentReceived),
       paymentReceivedDate: semesterPaymentDate,
       remarks: semesterRemarks,
@@ -222,12 +232,17 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
     };
 
     try {
+      if (editingRecordId && editingRecordId !== id) {
+        // Delete old record document ID
+        await deleteTutorshipRecord(editingRecordId);
+      }
       await saveTutorshipRecord(recordToSave);
       const updated = await fetchAndSyncTutorshipRecords();
       setRecords(updated);
       setSelectedSemester(newSemesterTerm);
       setSelectedProgram(newProgram);
       setShowSemesterModal(false);
+      setEditingRecordId(null);
       
       // Reset
       setNewSemesterTerm('');
@@ -237,6 +252,11 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
     } catch (err) {
       console.error('Error saving semester record:', err);
     }
+  };
+
+  const handleCloseSemesterModal = () => {
+    setShowSemesterModal(false);
+    setEditingRecordId(null);
   };
 
   // Delete current semester-program record
@@ -405,6 +425,7 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
               setSemesterPaymentReceived(0);
               setSemesterPaymentDate('');
               setSemesterRemarks('');
+              setEditingRecordId(null);
               setShowSemesterModal(true);
             }}
             className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs cursor-pointer transition-all ${
@@ -482,6 +503,7 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
                     setSemesterPaymentReceived(activeRecord.totalPaymentReceived);
                     setSemesterPaymentDate(activeRecord.paymentReceivedDate || '');
                     setSemesterRemarks(activeRecord.remarks || '');
+                    setEditingRecordId(activeRecord.id);
                     setShowSemesterModal(true);
                   }
                 }}
@@ -705,7 +727,7 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
                 {editingRecordId ? 'Update Tutorship Ledger' : 'Create Tutorship Semester'}
               </h3>
               <button
-                onClick={() => setShowSemesterModal(false)}
+                onClick={handleCloseSemesterModal}
                 className="text-gray-400 hover:text-gray-600 text-xs font-bold"
               >
                 Close
@@ -778,7 +800,7 @@ export default function TutorshipModule({ onBackToDashboard, theme }: TutorshipM
               <div className="pt-2 flex justify-end gap-2 text-xs font-bold">
                 <button
                   type="button"
-                  onClick={() => setShowSemesterModal(false)}
+                  onClick={handleCloseSemesterModal}
                   className="px-4 py-2 border rounded-lg text-gray-500 hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
