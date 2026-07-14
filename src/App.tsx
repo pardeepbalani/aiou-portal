@@ -10,7 +10,6 @@ import ExamRecordsModule from './components/ExamRecordsModule';
 import DegreeMgtModule from './components/DegreeMgtModule';
 import QuizMgtModule from './components/QuizMgtModule';
 import SemesterCourseCodesModule from './components/SemesterCourseCodesModule';
-import TutorshipModule from './components/TutorshipModule';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
 import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords, isQuotaExceeded } from './firebase';
@@ -27,7 +26,7 @@ export default function App() {
     return (localStorage.getItem('aiou_theme') as 'green' | 'blue') || 'green';
   });
 
-  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records' | 'quiz_records' | 'semester_courses' | 'tutorship'>(() => {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records' | 'quiz_records' | 'semester_courses'>(() => {
     return isLoggedIn ? 'dashboard' : 'dashboard'; // Default to dashboard if logged in
   });
 
@@ -340,9 +339,6 @@ export default function App() {
                 onSelectSemesterCourses={() => {
                   setCurrentView('semester_courses');
                 }}
-                onSelectTutorship={() => {
-                  setCurrentView('tutorship');
-                }}
                 theme={theme}
                 stats={statsSummary}
                 records={records}
@@ -435,13 +431,6 @@ export default function App() {
                 onBackToDashboard={() => setCurrentView('dashboard')}
                 studentRecords={records}
                 onUpdateStudent={handleSaveStudent}
-                theme={theme}
-              />
-            )}
-
-            {currentView === 'tutorship' && (
-              <TutorshipModule
-                onBackToDashboard={() => setCurrentView('dashboard')}
                 theme={theme}
               />
             )}

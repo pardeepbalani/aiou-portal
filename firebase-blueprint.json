@@ -204,23 +204,6 @@
         "id", "studentName", "fatherName", "studentId", "contactNumber", "courseCode",
         "quizDate", "status", "createdAt", "updatedAt"
       ]
-    },
-    "TutorshipRecord": {
-      "title": "TutorshipRecord",
-      "description": "Tutor workload schedules, assignments, deadlines, and payments due",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "semesterTerm": { "type": "string" },
-        "program": { "type": "string" },
-        "courses": { "type": "array" },
-        "totalPaymentReceived": { "type": "number" },
-        "paymentReceivedDate": { "type": "string" },
-        "remarks": { "type": "string" },
-        "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
-      },
-      "required": ["id", "semesterTerm", "program", "courses", "totalPaymentReceived", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -243,10 +226,6 @@
     "/quiz_records/{recordId}": {
       "schema": "StudentQuizRecord",
       "description": "Collection storing student online quiz dates, course details, and active reminders"
-    },
-    "/tutorship_records/{recordId}": {
-      "schema": "TutorshipRecord",
-      "description": "Collection storing AIOU tutorship workload logs, assignments, deadlines, and received payments for tutor PARDEEP"
     }
   }
 }

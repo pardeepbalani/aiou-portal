@@ -122,19 +122,6 @@ service cloud.firestore {
         && data.updatedAt is string;
     }
 
-    // Hardened validation function representing the TutorshipRecord schema
-    function isValidTutorshipRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.semesterTerm is string && data.semesterTerm.size() <= 128
-        && data.program is string && data.program.size() <= 128
-        && data.courses is list
-        && (data.totalPaymentReceived is int || data.totalPaymentReceived is float)
-        && (!('paymentReceivedDate' in data) || data.paymentReceivedDate is string)
-        && (!('remarks' in data) || data.remarks is string)
-        && data.createdAt is string
-        && data.updatedAt is string;
-    }
-
     // Rules for students_records collection
     match /students_records/{studentId} {
       // Public read operations are allowed with ID validation
@@ -220,23 +207,6 @@ service cloud.firestore {
         && incoming().id == existing().id
         && incoming().createdAt == existing().createdAt
         && isValidStudentQuizRecord(incoming());
-
-      allow delete: if isValidId(recordId);
-    }
-
-    // Rules for tutorship_records collection
-    match /tutorship_records/{recordId} {
-      allow get: if isValidId(recordId);
-      allow list: if true;
-
-      allow create: if isValidId(recordId)
-        && incoming().id == recordId
-        && isValidTutorshipRecord(incoming());
-
-      allow update: if isValidId(recordId)
-        && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
-        && isValidTutorshipRecord(incoming());
 
       allow delete: if isValidId(recordId);
     }
