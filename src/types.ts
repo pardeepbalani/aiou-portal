@@ -206,4 +206,20 @@ export interface StudentQuizRecord {
   updatedAt: string;
 }
 
+export interface ResearchProjectRecord {
+  id: string; // unique document ID, e.g. clean studentId_semester_year
+  semester: 'Spring' | 'Autumn';
+  year: string;
+  studentName: string;
+  registrationId: string;
+  researchTopic: string;
+  topicApprovalDate: string; // YYYY-MM-DD
+  supervisorName: string;
+  supervisorContact: string;
+  dueDate: string; // YYYY-MM-DD
+  createdAt: string;
+  updatedAt: string;
+}
+
+
 

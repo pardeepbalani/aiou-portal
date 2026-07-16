@@ -204,6 +204,29 @@
         "id", "studentName", "fatherName", "studentId", "contactNumber", "courseCode",
         "quizDate", "status", "createdAt", "updatedAt"
       ]
+    },
+    "ResearchProjectRecord": {
+      "title": "ResearchProjectRecord",
+      "description": "Student research project logs, topics, semester details, and assigned supervisor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "semester": { "type": "string", "enum": ["Spring", "Autumn"] },
+        "year": { "type": "string" },
+        "studentName": { "type": "string" },
+        "registrationId": { "type": "string" },
+        "researchTopic": { "type": "string" },
+        "topicApprovalDate": { "type": "string" },
+        "supervisorName": { "type": "string" },
+        "supervisorContact": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": [
+        "id", "semester", "year", "studentName", "registrationId", "researchTopic",
+        "topicApprovalDate", "supervisorName", "supervisorContact", "dueDate", "createdAt", "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -226,6 +249,10 @@
     "/quiz_records/{recordId}": {
       "schema": "StudentQuizRecord",
       "description": "Collection storing student online quiz dates, course details, and active reminders"
+    },
+    "/research_project_records/{recordId}": {
+      "schema": "ResearchProjectRecord",
+      "description": "Collection storing student research project registration records and supervisors"
     }
   }
 }

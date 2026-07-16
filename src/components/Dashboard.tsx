@@ -15,7 +15,8 @@ import {
   ArrowRight,
   Award,
   Bell,
-  BookOpenCheck
+  BookOpenCheck,
+  FileText
 } from 'lucide-react';
 import { StudentRecord } from '../types';
 
@@ -26,6 +27,7 @@ interface DashboardProps {
   onSelectDegreeMgt: () => void;
   onSelectQuizMgt: () => void;
   onSelectSemesterCourses: () => void;
+  onSelectResearchRecords: () => void;
   theme: 'green' | 'blue';
   stats: {
     totalStudents: number;
@@ -43,6 +45,7 @@ export default function Dashboard({
   onSelectDegreeMgt,
   onSelectQuizMgt,
   onSelectSemesterCourses,
+  onSelectResearchRecords,
   theme,
   stats,
   records,
@@ -353,6 +356,29 @@ export default function Dashboard({
           </h3>
           <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
             Fetch student program admissions, monitor course codes semester-by-semester, append academic semesters, and edit student courses.
+          </p>
+        </button>
+
+        {/* Research Project Records */}
+        <button
+          onClick={onSelectResearchRecords}
+          id="dashboard-research-records-button"
+          className={`flex flex-col items-center md:items-start md:text-left p-6 bg-white border rounded-2xl cursor-pointer group hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 ${
+            isGreen
+              ? 'border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/10'
+              : 'border-sky-100 hover:border-sky-300 hover:bg-sky-50/10'
+          }`}
+        >
+          <div className={`p-3.5 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 ${
+            isGreen ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
+          }`}>
+            <FileText size={28} className={isGreen ? "text-emerald-500 fill-emerald-100" : "text-sky-500 fill-sky-100"} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
+            Research Project Records
+          </h3>
+          <p className="mt-2 text-xs text-gray-500 leading-relaxed max-w-sm">
+            Log and manage student research project semester plans, topic assignments, approval tracking, and supervisor allocations.
           </p>
         </button>
       </div>

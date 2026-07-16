@@ -11,7 +11,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -27,8 +27,29 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with specific database ID if provided
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore safely to prevent app startup crash if custom database is not yet fully provisioned
+let initialDb: any;
+try {
+  if (firebaseConfig.firestoreDatabaseId) {
+    initialDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  } else {
+    initialDb = getFirestore(app);
+  }
+} catch (e) {
+  console.warn("Failed to initialize firestore with custom database ID, falling back to default:", e);
+  try {
+    initialDb = getFirestore(app);
+  } catch (err2) {
+    console.error("Failed to initialize default firestore:", err2);
+    // Create a safe dummy fallback object so module loads successfully and leverages local fallback
+    initialDb = {
+      type: 'firestore-fallback-dummy',
+      _databaseId: firebaseConfig.firestoreDatabaseId || '(default)'
+    } as any;
+  }
+}
+
+export const db = initialDb;
 export const auth = getAuth(app);
 
 export enum OperationType {
@@ -911,5 +932,125 @@ export async function deleteStudentQuizRecord(id: string): Promise<void> {
     setQuotaExceeded(true);
   }
 }
+
+// ==========================================
+// RESEARCH PROJECT RECORDS LOGIC
+// ==========================================
+const RESEARCH_PROJECT_RECORDS_COLLECTION = 'research_project_records';
+const LOCAL_RESEARCH_PROJECT_RECORDS_KEY = 'aiou_local_research_project_records';
+
+export function getLocalResearchProjectRecords(): ResearchProjectRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_RESEARCH_PROJECT_RECORDS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(RESEARCH_PROJECT_RECORDS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local research project records:', error);
+    return [];
+  }
+}
+
+export function saveLocalResearchProjectRecords(records: ResearchProjectRecord[]): void {
+  try {
+    const deletedIds = getDeletedIds(RESEARCH_PROJECT_RECORDS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_RESEARCH_PROJECT_RECORDS_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local research project records:', error);
+  }
+}
+
+export async function saveResearchProjectRecord(record: ResearchProjectRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord: ResearchProjectRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  // Remove from deleted tracking if present
+  removeDeletedId(RESEARCH_PROJECT_RECORDS_COLLECTION, updatedRecord.id);
+
+  const local = getLocalResearchProjectRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalResearchProjectRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, RESEARCH_PROJECT_RECORDS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.warn('Firestore write failed for Research Project Record, using local fallback. Error:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncResearchProjectRecords(): Promise<ResearchProjectRecord[]> {
+  const deletedIds = getDeletedIds(RESEARCH_PROJECT_RECORDS_COLLECTION);
+  let remoteRecords: ResearchProjectRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, RESEARCH_PROJECT_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as ResearchProjectRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Research Project Records. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalResearchProjectRecords();
+  }
+
+  const local = getLocalResearchProjectRecords();
+  const mergedMap = new Map<string, ResearchProjectRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalResearchProjectRecords(merged);
+  return merged;
+}
+
+export async function deleteResearchProjectRecord(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(RESEARCH_PROJECT_RECORDS_COLLECTION, id);
+
+  const local = getLocalResearchProjectRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalResearchProjectRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, RESEARCH_PROJECT_RECORDS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.error('Firestore delete failed for Research Project Record:', error);
+    setQuotaExceeded(true);
+  }
+}
+
 
 

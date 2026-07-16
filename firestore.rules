@@ -122,6 +122,22 @@ service cloud.firestore {
         && data.updatedAt is string;
     }
 
+    // Hardened validation function representing the ResearchProjectRecord schema
+    function isValidResearchProjectRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && (data.semester == 'Spring' || data.semester == 'Autumn')
+        && data.year is string && data.year.size() <= 32
+        && data.studentName is string && data.studentName.size() <= 256
+        && data.registrationId is string && data.registrationId.size() <= 128
+        && data.researchTopic is string && data.researchTopic.size() <= 512
+        && data.topicApprovalDate is string
+        && data.supervisorName is string && data.supervisorName.size() <= 256
+        && data.supervisorContact is string && data.supervisorContact.size() <= 32
+        && data.dueDate is string
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
     // Rules for students_records collection
     match /students_records/{studentId} {
       // Public read operations are allowed with ID validation
@@ -207,6 +223,23 @@ service cloud.firestore {
         && incoming().id == existing().id
         && incoming().createdAt == existing().createdAt
         && isValidStudentQuizRecord(incoming());
+
+      allow delete: if isValidId(recordId);
+    }
+
+    // Rules for research_project_records collection
+    match /research_project_records/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidResearchProjectRecord(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidResearchProjectRecord(incoming());
 
       allow delete: if isValidId(recordId);
     }

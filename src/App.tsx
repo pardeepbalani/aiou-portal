@@ -10,6 +10,7 @@ import ExamRecordsModule from './components/ExamRecordsModule';
 import DegreeMgtModule from './components/DegreeMgtModule';
 import QuizMgtModule from './components/QuizMgtModule';
 import SemesterCourseCodesModule from './components/SemesterCourseCodesModule';
+import ResearchProjectModule from './components/ResearchProjectModule';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
 import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords, isQuotaExceeded } from './firebase';
@@ -26,7 +27,7 @@ export default function App() {
     return (localStorage.getItem('aiou_theme') as 'green' | 'blue') || 'green';
   });
 
-  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records' | 'quiz_records' | 'semester_courses'>(() => {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records' | 'quiz_records' | 'semester_courses' | 'research_records'>(() => {
     return isLoggedIn ? 'dashboard' : 'dashboard'; // Default to dashboard if logged in
   });
 
@@ -339,6 +340,9 @@ export default function App() {
                 onSelectSemesterCourses={() => {
                   setCurrentView('semester_courses');
                 }}
+                onSelectResearchRecords={() => {
+                  setCurrentView('research_records');
+                }}
                 theme={theme}
                 stats={statsSummary}
                 records={records}
@@ -431,6 +435,13 @@ export default function App() {
                 onBackToDashboard={() => setCurrentView('dashboard')}
                 studentRecords={records}
                 onUpdateStudent={handleSaveStudent}
+                theme={theme}
+              />
+            )}
+
+            {currentView === 'research_records' && (
+              <ResearchProjectModule
+                onBackToDashboard={() => setCurrentView('dashboard')}
                 theme={theme}
               />
             )}
