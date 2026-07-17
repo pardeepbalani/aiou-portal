@@ -198,6 +198,7 @@ export function sanitizeStudentRecord(r: any): StudentRecord {
     servicePhysicalWorkshop: Boolean(r?.servicePhysicalWorkshop),
     serviceResearchReport: Boolean(r?.serviceResearchReport),
     status: (r?.status === 'completed' || r?.status === 'suspended') ? r.status : 'active',
+    programCategory: typeof r?.programCategory === 'string' ? r.programCategory : undefined,
     createdAt: typeof r?.createdAt === 'string' ? r.createdAt : new Date().toISOString(),
     updatedAt: typeof r?.updatedAt === 'string' ? r.updatedAt : new Date().toISOString(),
   };

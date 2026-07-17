@@ -144,6 +144,7 @@ export const PROGRAM_SEMESTERS_MAP: Record<string, number> = {
   'B.A Admission': 4,
   'B.Com Admission': 4,
   'Other BS Programs': 8,
+  'BS Programs (2.5 Years)': 5,
   'Matriculation (2 Years)': 4,
   'Intermediate (2 Years)': 4,
 };
@@ -155,6 +156,7 @@ export const PROGRAM_OPTIONS = [
   'B.A Admission',
   'B.Com Admission',
   'Other BS Programs',
+  'BS Programs (2.5 Years)',
   'Matriculation (2 Years)',
   'Intermediate (2 Years)',
 ];

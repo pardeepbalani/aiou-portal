@@ -60,6 +60,28 @@ export default function EnrollmentForm({
   const [status, setStatus] = useState<StudentStatus>('active');
   const [programCategory, setProgramCategory] = useState('');
 
+  // Standard BS programs options list
+  const STANDARD_BS_PROGRAMS = [
+    'BS Computer Science',
+    'BS Information Technology',
+    'BS Software Engineering',
+    'BS Business Administration (BBA)',
+    'BS Commerce',
+    'BS Accounting & Finance',
+    'BS English',
+    'BS Urdu',
+    'BS Islamic Studies',
+    'BS Pakistan Studies',
+    'BS Mathematics',
+    'BS Physics',
+    'BS Chemistry',
+    'BS Sociology',
+    'BS Mass Communication'
+  ];
+
+  const [selectedBsProgram, setSelectedBsProgram] = useState('BS Computer Science');
+  const [customBsProgram, setCustomBsProgram] = useState('');
+
   // Academic Semesters State
   const [semesters, setSemesters] = useState<SemesterData[]>([]);
 
@@ -162,8 +184,26 @@ export default function EnrollmentForm({
       setServiceResearchReport(initialStudent.serviceResearchReport || false);
       setStatus(initialStudent.status || 'active');
       setProgramCategory(initialStudent.programCategory || '');
+      
+      if (initialStudent.programSelected === 'Other BS Programs' || initialStudent.programSelected === 'BS Programs (2.5 Years)') {
+        const cat = initialStudent.programCategory || '';
+        if (STANDARD_BS_PROGRAMS.includes(cat)) {
+          setSelectedBsProgram(cat);
+          setCustomBsProgram('');
+        } else if (cat) {
+          setSelectedBsProgram('Other');
+          setCustomBsProgram(cat);
+        } else {
+          setSelectedBsProgram('BS Computer Science');
+          setCustomBsProgram('');
+        }
+      }
     } else {
-      if (programName.includes('Matriculation')) {
+      if (programName === 'Other BS Programs' || programName === 'BS Programs (2.5 Years)') {
+        setProgramCategory('BS Computer Science');
+        setSelectedBsProgram('BS Computer Science');
+        setCustomBsProgram('');
+      } else if (programName.includes('Matriculation')) {
         setProgramCategory('Science');
       } else if (programName.includes('Intermediate')) {
         setProgramCategory('Pre-medical');
@@ -450,6 +490,55 @@ export default function EnrollmentForm({
                   )}
                 </select>
               </div>
+            )}
+
+            {(programName === 'Other BS Programs' || programName === 'BS Programs (2.5 Years)') && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    BS Program *
+                  </label>
+                  <select
+                    required
+                    value={selectedBsProgram}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedBsProgram(val);
+                      if (val !== 'Other') {
+                        setProgramCategory(val);
+                      } else {
+                        setProgramCategory(customBsProgram);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-semibold text-gray-800"
+                  >
+                    {STANDARD_BS_PROGRAMS.map(prog => (
+                      <option key={prog} value={prog}>{prog}</option>
+                    ))}
+                    <option value="Other">Other (Specify...)</option>
+                  </select>
+                </div>
+
+                {selectedBsProgram === 'Other' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Specify BS Program *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={customBsProgram}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomBsProgram(val);
+                        setProgramCategory(val);
+                      }}
+                      placeholder="e.g. BS Psychology"
+                      className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all bg-white font-semibold text-gray-800"
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             <div>
