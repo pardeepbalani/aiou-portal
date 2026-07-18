@@ -23,7 +23,8 @@ import {
   CheckCircle,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Receipt
 } from 'lucide-react';
 import { 
   StudentRecord, 
@@ -31,7 +32,10 @@ import {
   StudentExamInfo, 
   CourseExamDate, 
   ExamPaymentHistory,
-  StudentExamSemester
+  StudentExamSemester,
+  ExamManagerPaymentRecord,
+  CoursePaymentDetails,
+  ManagerPaymentEntry
 } from '../types';
 import SecurityAuthModal from './SecurityAuthModal';
 import { 
@@ -40,7 +44,10 @@ import {
   deleteExamManager, 
   saveStudentExamInfo, 
   fetchAndSyncStudentExamInfos, 
-  deleteStudentExamInfo 
+  deleteStudentExamInfo,
+  saveExamManagerPaymentRecord,
+  fetchAndSyncExamManagerPaymentRecords,
+  deleteExamManagerPaymentRecord
 } from '../firebase';
 
 interface ExamRecordsModuleProps {
@@ -57,7 +64,7 @@ export default function ExamRecordsModule({
   const isGreen = theme === 'green';
 
   // Core navigation states
-  const [step, setStep] = useState<'centre' | 'manager' | 'courses' | 'student_exam'>('centre');
+  const [step, setStep] = useState<'centre' | 'manager' | 'manager_options' | 'student_exam' | 'payment_records'>('centre');
   const [selectedCentre, setSelectedCentre] = useState<'Mithi' | 'Diplo' | null>(null);
   const [selectedManager, setSelectedManager] = useState<ExamManager | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
@@ -98,18 +105,45 @@ export default function ExamRecordsModule({
   const [newCourseCodeInput, setNewCourseCodeInput] = useState('');
 
   // Payment Form fields
-  const [totalFee, setTotalFee] = useState<number>(0);
+  const [totalFee, setTotalFee] = useState<number | ''>('');
   const [amountReceived, setAmountReceived] = useState<number>(0);
   const [paymentHistory, setPaymentHistory] = useState<ExamPaymentHistory[]>([]);
   const [newPayAmount, setNewPayAmount] = useState('');
   const [newPayDate, setNewPayDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Active console sub-section tab ('students' or 'payments')
+  const [activeConsoleTab, setActiveConsoleTab] = useState<'students' | 'payments'>('students');
+
+  // Exam Manager Payment Records states
+  const [paymentRecords, setPaymentRecords] = useState<ExamManagerPaymentRecord[]>([]);
+  const [editingPaymentRecord, setEditingPaymentRecord] = useState<ExamManagerPaymentRecord | null>(null);
+  const [isPaymentFormOpen, setIsPaymentFormOpen] = useState<boolean>(false);
+  const [paymentSemester, setPaymentSemester] = useState<string>('Autumn');
+  const [paymentYear, setPaymentYear] = useState<string>('2026');
+  const [paymentCourses, setPaymentCourses] = useState<CoursePaymentDetails[]>([]);
+  const [paymentSearchQuery, setPaymentSearchQuery] = useState<string>('');
+
+  // Course row entry inside the form
+  const [formCourseName, setFormCourseName] = useState<string>('BA');
+  const [formCustomCourseName, setFormCustomCourseName] = useState<string>('');
+  const [formPerPaperRate, setFormPerPaperRate] = useState<number | ''>('');
+  const [formTotalPapers, setFormTotalPapers] = useState<number | ''>('');
+  const [formEditingCourseId, setFormEditingCourseId] = useState<string | null>(null);
+
+  // Expanded payment record ID for managing additional payments and viewing details
+  const [expandedPaymentRecordId, setExpandedPaymentRecordId] = useState<string | null>(null);
+
+  // Add payment states (for payments made later)
+  const [newEntryDate, setNewEntryDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [newEntryAmount, setNewEntryAmount] = useState<number | ''>('');
+  const [newEntryRemarks, setNewEntryRemarks] = useState<string>('');
 
   // Toast simulations
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Security Auth Modal for Deletion
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleteType, setDeleteType] = useState<'manager' | 'exam_info' | null>(null);
+  const [deleteType, setDeleteType] = useState<'manager' | 'exam_info' | 'payment_record' | null>(null);
   const [idToDelete, setIdToDelete] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<string>('');
 
@@ -130,7 +164,7 @@ export default function ExamRecordsModule({
       setActiveFormSemId(semId);
       setExamCourseCodes(activeSem.courseCodes || []);
       setExamDatesList(activeSem.examDates || []);
-      setTotalFee(activeSem.totalFee || 0);
+      setTotalFee(activeSem.totalFee === undefined ? '' : activeSem.totalFee);
       setAmountReceived(activeSem.amountReceived || 0);
       setPaymentHistory(activeSem.paymentHistory || []);
       
@@ -155,7 +189,7 @@ export default function ExamRecordsModule({
           semesterTerm: rec.semesterTerm || 'Autumn 2026',
           courseCodes: rec.courseCodes || (rec.courseCode ? [rec.courseCode] : []),
           examDates: rec.examDates || [],
-          totalFee: rec.totalFee || 0,
+          totalFee: rec.totalFee === undefined || rec.totalFee === null ? undefined : rec.totalFee,
           amountReceived: rec.amountReceived || 0,
           paymentHistory: rec.paymentHistory || []
         };
@@ -182,7 +216,7 @@ export default function ExamRecordsModule({
       semesterTerm: termStr,
       courseCodes: [],
       examDates: [],
-      totalFee: 2500,
+      totalFee: undefined,
       amountReceived: 0,
       paymentHistory: []
     };
@@ -193,7 +227,7 @@ export default function ExamRecordsModule({
     // Sync input fields
     setExamCourseCodes([]);
     setExamDatesList([]);
-    setTotalFee(2500);
+    setTotalFee('');
     setAmountReceived(0);
     setPaymentHistory([]);
     setNewPayAmount('');
@@ -219,14 +253,16 @@ export default function ExamRecordsModule({
     }
   };
 
-  // Load managers and exam records on mount and sync
+  // Load managers, exam records, and payment records on mount and sync
   const loadExamData = async () => {
     setLoading(true);
     try {
       const syncedManagers = await fetchAndSyncExamManagers();
       const syncedExamRecords = await fetchAndSyncStudentExamInfos();
+      const syncedPaymentRecords = await fetchAndSyncExamManagerPaymentRecords();
       setManagers(syncedManagers);
       setNormalizedExamRecords(syncedExamRecords);
+      setPaymentRecords(syncedPaymentRecords);
     } catch (err) {
       console.error('Failed to sync Exam module tables:', err);
     } finally {
@@ -253,11 +289,18 @@ export default function ExamRecordsModule({
     )
   )).filter(Boolean).sort();
 
-  // Add standard fallback courses to offer complete educational listing if none exist yet
+  // Add standard fallback courses and scheduled courses to offer complete educational listing
   const defaultFallbackCourses = ['8601', '8602', '8603', '8604', '8605', '8606', '8607', '8608', '8613', '5601', '5602'];
-  const allAvailableCourses = enrolledCourses.length > 0 
-    ? Array.from(new Set([...enrolledCourses, ...defaultFallbackCourses])).sort()
-    : defaultFallbackCourses;
+  const scheduledCourseCodes = Array.from(new Set(
+    examRecords.flatMap(r => 
+      (r.semesters || []).flatMap(s => s.courseCodes || [])
+    )
+  ));
+  const allAvailableCourses = Array.from(new Set([
+    ...enrolledCourses,
+    ...scheduledCourseCodes,
+    ...defaultFallbackCourses
+  ])).filter(Boolean).sort();
 
   // Filter managers and records by selection
   const filteredManagers = managers.filter(m => m.centre === selectedCentre);
@@ -346,7 +389,7 @@ export default function ExamRecordsModule({
         reappearDate: '',
         remarks: ''
       })),
-      totalFee: 2500,
+      totalFee: undefined,
       amountReceived: 0,
       paymentHistory: []
     }];
@@ -362,7 +405,7 @@ export default function ExamRecordsModule({
       reappearDate: '',
       remarks: ''
     })));
-    setTotalFee(2500); // Standard paper fee
+    setTotalFee(''); // Empty/blank by default
     setAmountReceived(0);
     setPaymentHistory([]);
     setNewPayAmount('');
@@ -385,7 +428,7 @@ export default function ExamRecordsModule({
         semesterTerm: info.semesterTerm || 'Autumn 2026',
         courseCodes: info.courseCodes || (info.courseCode ? [info.courseCode] : []),
         examDates: info.examDates || [],
-        totalFee: info.totalFee || 0,
+        totalFee: info.totalFee === undefined || info.totalFee === null ? undefined : info.totalFee,
         amountReceived: info.amountReceived || 0,
         paymentHistory: info.paymentHistory || []
       }];
@@ -400,7 +443,7 @@ export default function ExamRecordsModule({
     // Sync input fields
     setExamCourseCodes(firstSem.courseCodes || []);
     setExamDatesList(firstSem.examDates || []);
-    setTotalFee(firstSem.totalFee || 0);
+    setTotalFee(firstSem.totalFee === undefined || firstSem.totalFee === null ? '' : firstSem.totalFee);
     setAmountReceived(firstSem.amountReceived || 0);
     setPaymentHistory(firstSem.paymentHistory || []);
 
@@ -439,6 +482,11 @@ export default function ExamRecordsModule({
         const updated = await fetchAndSyncStudentExamInfos();
         setNormalizedExamRecords(updated);
         triggerToast('Exam registration deleted.');
+      } else if (deleteType === 'payment_record') {
+        await deleteExamManagerPaymentRecord(idToDelete);
+        const updated = await fetchAndSyncExamManagerPaymentRecords();
+        setPaymentRecords(updated);
+        triggerToast('Payment record deleted.');
       }
     } catch (err) {
       console.error(err);
@@ -447,6 +495,219 @@ export default function ExamRecordsModule({
       setDeleteModalOpen(false);
       setIdToDelete(null);
       setDeleteType(null);
+    }
+  };
+
+  // Helper to dynamically calculate total paper quantity for a course code under the selected manager
+  const calculatePaperQuantity = (courseCode: string): number => {
+    let quantity = 0;
+    examRecords.forEach(rec => {
+      if (rec.managerId === selectedManager?.id) {
+        if (rec.semesters && rec.semesters.length > 0) {
+          rec.semesters.forEach(sem => {
+            if (sem.courseCodes && sem.courseCodes.includes(courseCode)) {
+              quantity++;
+            }
+          });
+        } else {
+          if (rec.courseCodes && rec.courseCodes.includes(courseCode)) {
+            quantity++;
+          } else if (rec.courseCode === courseCode) {
+            quantity++;
+          }
+        }
+      }
+    });
+    return quantity;
+  };
+
+  // Helper to generate sequential S. No. for a manager's payment records
+  const generateSerialNoForManager = (mgrId: string): number => {
+    const mgrRecords = paymentRecords.filter(r => r.managerId === mgrId);
+    if (mgrRecords.length === 0) return 1;
+    const maxSerial = Math.max(...mgrRecords.map(r => r.serialNo || 0));
+    return maxSerial + 1;
+  };
+
+  // Add/edit course row within the payment record form
+  const handleAddCourseRow = () => {
+    const finalCourseName = formCourseName === 'Other Programs' ? formCustomCourseName.trim() : formCourseName;
+    if (!finalCourseName) {
+      triggerToast('Please enter or select a valid course name.');
+      return;
+    }
+    if (formPerPaperRate === '' || formTotalPapers === '') {
+      triggerToast('Please provide both Per Paper Rate and Total Papers.');
+      return;
+    }
+
+    const rate = Number(formPerPaperRate);
+    const papers = Number(formTotalPapers);
+    const amount = rate * papers;
+
+    if (formEditingCourseId) {
+      setPaymentCourses(prev => prev.map(c => c.id === formEditingCourseId ? {
+        ...c,
+        courseName: finalCourseName,
+        perPaperRate: rate,
+        totalPapers: papers,
+        totalAmount: amount
+      } : c));
+      setFormEditingCourseId(null);
+      triggerToast('Course updated in list.');
+    } else {
+      const newRow: CoursePaymentDetails = {
+        id: `course-${Math.random().toString(36).substr(2, 9)}`,
+        courseName: finalCourseName,
+        perPaperRate: rate,
+        totalPapers: papers,
+        totalAmount: amount
+      };
+      setPaymentCourses(prev => [...prev, newRow]);
+      triggerToast('Course added to list.');
+    }
+
+    // Reset row inputs
+    setFormCourseName('BA');
+    setFormCustomCourseName('');
+    setFormPerPaperRate('');
+    setFormTotalPapers('');
+  };
+
+  const handleEditCourseRow = (row: CoursePaymentDetails) => {
+    const presets = ['BA', 'B.Com', 'B.Ed'];
+    if (presets.includes(row.courseName)) {
+      setFormCourseName(row.courseName);
+      setFormCustomCourseName('');
+    } else {
+      setFormCourseName('Other Programs');
+      setFormCustomCourseName(row.courseName);
+    }
+    setFormPerPaperRate(row.perPaperRate);
+    setFormTotalPapers(row.totalPapers);
+    setFormEditingCourseId(row.id);
+  };
+
+  const handleDeleteCourseRow = (id: string) => {
+    setPaymentCourses(prev => prev.filter(c => c.id !== id));
+    if (formEditingCourseId === id) {
+      setFormEditingCourseId(null);
+    }
+    triggerToast('Course removed from list.');
+  };
+
+  // Save full Payment Record for Exam Manager
+  const handleSavePaymentRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedManager) return;
+    if (paymentCourses.length === 0) {
+      triggerToast('Please add at least one course to the payment record.');
+      return;
+    }
+
+    const grandTotal = paymentCourses.reduce((sum, c) => sum + c.totalAmount, 0);
+    const paymentsList = editingPaymentRecord ? (editingPaymentRecord.payments || []) : [];
+    const totalPaid = paymentsList.reduce((sum, p) => sum + p.amount, 0);
+    const remaining = grandTotal - totalPaid;
+    const serialNo = editingPaymentRecord ? editingPaymentRecord.serialNo : generateSerialNoForManager(selectedManager.id);
+
+    const recordObj: ExamManagerPaymentRecord = {
+      id: editingPaymentRecord ? editingPaymentRecord.id : `payrec-${Math.random().toString(36).substr(2, 9)}`,
+      managerId: selectedManager.id,
+      semester: paymentSemester,
+      year: paymentYear,
+      serialNo,
+      courses: paymentCourses,
+      grandTotal,
+      payments: paymentsList,
+      totalPaidAmount: totalPaid,
+      remainingAmountPayable: remaining,
+      createdAt: editingPaymentRecord ? editingPaymentRecord.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await saveExamManagerPaymentRecord(recordObj);
+      const updated = await fetchAndSyncExamManagerPaymentRecords();
+      setPaymentRecords(updated);
+      setIsPaymentFormOpen(false);
+      setEditingPaymentRecord(null);
+      setPaymentCourses([]);
+      triggerToast(editingPaymentRecord ? 'Payment record updated successfully!' : 'New payment record created successfully!');
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to save payment record.');
+    }
+  };
+
+  // Delete Course Payment Record for Exam Manager
+  const handleDeletePaymentRecordClick = (id: string) => {
+    setIdToDelete(id);
+    setDeleteType('payment_record');
+    setDeleteMessage('Are you sure you want to delete this payment record and all associated history?');
+    setDeleteModalOpen(true);
+  };
+
+  // Record additional payments made later
+  const handleAddPaymentEntry = async (record: ExamManagerPaymentRecord) => {
+    if (newEntryAmount === '' || Number(newEntryAmount) <= 0) {
+      triggerToast('Please enter a valid payment amount.');
+      return;
+    }
+
+    const newPayment: ManagerPaymentEntry = {
+      id: `entry-${Math.random().toString(36).substr(2, 9)}`,
+      date: newEntryDate,
+      amount: Number(newEntryAmount),
+      remarks: newEntryRemarks.trim() || undefined
+    };
+
+    const updatedPayments = [...(record.payments || []), newPayment];
+    const updatedPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const updatedRemaining = record.grandTotal - updatedPaid;
+
+    const updatedRecord: ExamManagerPaymentRecord = {
+      ...record,
+      payments: updatedPayments,
+      totalPaidAmount: updatedPaid,
+      remainingAmountPayable: updatedRemaining,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await saveExamManagerPaymentRecord(updatedRecord);
+      const updatedList = await fetchAndSyncExamManagerPaymentRecords();
+      setPaymentRecords(updatedList);
+      setNewEntryAmount('');
+      setNewEntryRemarks('');
+      triggerToast('Payment entry recorded successfully!');
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to record payment.');
+    }
+  };
+
+  const handleDeletePaymentEntry = async (record: ExamManagerPaymentRecord, entryId: string) => {
+    const updatedPayments = (record.payments || []).filter(p => p.id !== entryId);
+    const updatedPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const updatedRemaining = record.grandTotal - updatedPaid;
+
+    const updatedRecord: ExamManagerPaymentRecord = {
+      ...record,
+      payments: updatedPayments,
+      totalPaidAmount: updatedPaid,
+      remainingAmountPayable: updatedRemaining,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await saveExamManagerPaymentRecord(updatedRecord);
+      const updatedList = await fetchAndSyncExamManagerPaymentRecords();
+      setPaymentRecords(updatedList);
+      triggerToast('Payment entry removed.');
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to delete payment entry.');
     }
   };
 
@@ -466,7 +727,7 @@ export default function ExamRecordsModule({
       reappearDate: '', 
       remarks: '' 
     }];
-    const updatedFee = totalFee + 500;
+    const updatedFee = totalFee;
 
     setExamCourseCodes(updatedCodes);
     setExamDatesList(updatedDates);
@@ -477,7 +738,7 @@ export default function ExamRecordsModule({
       updateSemester(activeFormSemId, {
         courseCodes: updatedCodes,
         examDates: updatedDates,
-        totalFee: updatedFee
+        totalFee: updatedFee === '' ? undefined : updatedFee
       });
     }
   };
@@ -486,7 +747,7 @@ export default function ExamRecordsModule({
   const handleRemoveCourseCodeFromExam = (code: string) => {
     const updatedCodes = examCourseCodes.filter(c => c !== code);
     const updatedDates = examDatesList.filter(d => d.courseCode !== code);
-    const updatedFee = Math.max(1000, totalFee - 500);
+    const updatedFee = totalFee;
 
     setExamCourseCodes(updatedCodes);
     setExamDatesList(updatedDates);
@@ -496,7 +757,7 @@ export default function ExamRecordsModule({
       updateSemester(activeFormSemId, {
         courseCodes: updatedCodes,
         examDates: updatedDates,
-        totalFee: updatedFee
+        totalFee: updatedFee === '' ? undefined : updatedFee
       });
     }
   };
@@ -542,7 +803,8 @@ export default function ExamRecordsModule({
       triggerToast('Enter a valid positive payment amount.');
       return;
     }
-    const remaining = totalFee - amountReceived;
+    const feeNum = totalFee === '' ? 0 : totalFee;
+    const remaining = feeNum - amountReceived;
     if (amt > remaining) {
       triggerToast(`Amount exceeds outstanding balance (Rs. ${remaining.toLocaleString()}).`);
       return;
@@ -614,7 +876,7 @@ export default function ExamRecordsModule({
           reappearDate: '',
           remarks: ''
         })),
-        totalFee: 1000 + (codes.length * 500),
+        totalFee: undefined,
         amountReceived: 0,
         paymentHistory: []
       };
@@ -630,7 +892,7 @@ export default function ExamRecordsModule({
         reappearDate: '',
         remarks: ''
       })));
-      setTotalFee(1000 + (codes.length * 500));
+      setTotalFee('');
       setAmountReceived(0);
       setPaymentHistory([]);
       setNewPayAmount('');
@@ -659,8 +921,20 @@ export default function ExamRecordsModule({
       return;
     }
 
-    // Keep active or first semester's values as top-level properties for legacy compatibility
-    const activeSem = formSemesters.find(s => s.id === activeFormSemId) || formSemesters[0];
+    // Ensure the current input states are synced to the active semester before saving
+    const syncedSemesters = formSemesters.map(sem => {
+      if (sem.id === activeFormSemId) {
+        return {
+          ...sem,
+          totalFee: totalFee === '' ? undefined : totalFee,
+          amountReceived: amountReceived,
+          paymentHistory: paymentHistory
+        };
+      }
+      return sem;
+    });
+
+    const activeSem = syncedSemesters.find(s => s.id === activeFormSemId) || syncedSemesters[0];
 
     const examObj: StudentExamInfo = {
       id: editingExamInfo ? editingExamInfo.id : `exam-${Math.random().toString(36).substr(2, 9)}`,
@@ -673,7 +947,7 @@ export default function ExamRecordsModule({
       contactNumber: examContactNumber.trim(),
       
       // Multiple semesters support
-      semesters: formSemesters,
+      semesters: syncedSemesters,
 
       // Legacy fallback support fields
       semesterTerm: activeSem.semesterTerm,
@@ -681,7 +955,7 @@ export default function ExamRecordsModule({
       examDates: activeSem.examDates,
       totalFee: activeSem.totalFee,
       amountReceived: activeSem.amountReceived,
-      remainingBalance: Math.max(0, activeSem.totalFee - activeSem.amountReceived),
+      remainingBalance: Math.max(0, (activeSem.totalFee || 0) - activeSem.amountReceived),
       paymentHistory: activeSem.paymentHistory,
 
       createdAt: editingExamInfo ? editingExamInfo.createdAt : new Date().toISOString(),
@@ -764,7 +1038,9 @@ export default function ExamRecordsModule({
         <div className="flex items-center gap-3">
           <button 
             onClick={() => {
-              if (step === 'student_exam') setStep('manager');
+              if (step === 'student_exam') setStep('manager_options');
+              else if (step === 'payment_records') setStep('manager_options');
+              else if (step === 'manager_options') setStep('manager');
               else if (step === 'manager') setStep('centre');
               else onBackToDashboard();
             }}
@@ -995,7 +1271,8 @@ export default function ExamRecordsModule({
                     key={mgr.id}
                     onClick={() => {
                       setSelectedManager(mgr);
-                      setStep('student_exam');
+                      setSelectedCourse(null);
+                      setStep('manager_options');
                     }}
                     className="p-5 bg-white border border-gray-150 rounded-2xl hover:border-purple-300 hover:shadow-xs cursor-pointer transition-all duration-150 flex flex-col justify-between group"
                   >
@@ -1061,6 +1338,82 @@ export default function ExamRecordsModule({
         </div>
       )}
 
+      {/* STEP 3.5: EXAM MANAGER OPTIONS SCREEN */}
+      {step === 'manager_options' && selectedManager && (
+        <div className="space-y-6">
+          {/* Header contextual breadcrumb */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-[9px] font-black uppercase text-purple-600 font-mono tracking-wider font-extrabold">Exam Hub Manager Control Options</span>
+              <h3 className="text-base font-extrabold text-gray-900">
+                Manage {selectedManager.name}
+              </h3>
+              <p className="text-xs text-gray-400">
+                Centre: <strong>{selectedCentre} Centre</strong> • Phone: {selectedManager.phone}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setStep('manager')}
+              className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 rounded-xl cursor-pointer"
+            >
+              Back to Managers
+            </button>
+          </div>
+
+          {/* Options Grid */}
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto pt-4">
+            {/* Option 1: Registration list of students */}
+            <div
+              onClick={() => setStep('student_exam')}
+              className="group p-6 bg-white border border-gray-150 rounded-2xl hover:border-purple-400 hover:shadow-md cursor-pointer transition-all duration-200 flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="p-3 bg-purple-50 text-purple-700 rounded-2xl w-fit group-hover:bg-purple-100 transition-colors">
+                  <Users size={32} className="text-purple-600 fill-purple-100" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-base text-gray-900 group-hover:text-purple-700 transition-colors">
+                    1. Student Registration List
+                  </h4>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    View list of student examination enrollments, add new schedules, modify date sheets, and manage paper fee receivables.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between text-xs font-bold text-purple-600">
+                <span>View Students</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
+            </div>
+
+            {/* Option 2: Payment to Exam manager records */}
+            <div
+              onClick={() => setStep('payment_records')}
+              className="group p-6 bg-white border border-gray-150 rounded-2xl hover:border-blue-400 hover:shadow-md cursor-pointer transition-all duration-200 flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="p-3 bg-blue-50 text-blue-750 rounded-2xl w-fit group-hover:bg-blue-100 transition-colors">
+                  <Receipt size={32} className="text-blue-600 fill-blue-100" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-base text-gray-900 group-hover:text-blue-700 transition-colors">
+                    2. Payment to Exam Manager Records
+                  </h4>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Review per-course paper rates, audit quantities, calculate total payable amounts, record payouts, and balance ledgers.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between text-xs font-bold text-blue-600">
+                <span>View Payment Ledger</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* STEP 4: COURSE CHOSEN -> REGISTRATIONS LIST & FORM */}
       {step === 'student_exam' && selectedManager && (
         <div className="space-y-6">
@@ -1079,10 +1432,10 @@ export default function ExamRecordsModule({
 
             <div className="flex gap-2">
               <button
-                onClick={() => setStep('manager')}
+                onClick={() => setStep('manager_options')}
                 className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 rounded-xl cursor-pointer"
               >
-                Back to Managers
+                Back to Manager Options
               </button>
               <button
                 onClick={handleAddExamClick}
@@ -1153,6 +1506,8 @@ export default function ExamRecordsModule({
               </div>
             )}
           </div>
+
+
 
           {/* Exam Registration Form Modal */}
           {isExamFormOpen && (
@@ -1505,9 +1860,17 @@ export default function ExamRecordsModule({
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Total Paper Fee Receivable (Rs.)</label>
                         <input
                           type="number"
-                          required
+                          placeholder="e.g. 2500"
                           value={totalFee}
-                          onChange={(e) => setTotalFee(Math.max(0, parseFloat(e.target.value) || 0))}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0);
+                            setTotalFee(val);
+                            if (activeFormSemId) {
+                              updateSemester(activeFormSemId, {
+                                totalFee: val === '' ? undefined : val
+                              });
+                            }
+                          }}
                           className="w-full text-xs px-3 py-1.5 border border-gray-300 rounded-lg bg-white focus:outline-hidden font-bold font-mono"
                         />
                       </div>
@@ -1519,7 +1882,7 @@ export default function ExamRecordsModule({
 
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-gray-400 font-bold uppercase text-[9px]">Remaining Balance:</span>
-                        <span className="font-black text-amber-700 font-mono">Rs. {(totalFee - amountReceived).toLocaleString()}</span>
+                        <span className="font-black text-amber-700 font-mono">Rs. {((totalFee === '' ? 0 : totalFee) - amountReceived).toLocaleString()}</span>
                       </div>
                     </div>
 
@@ -1608,10 +1971,11 @@ export default function ExamRecordsModule({
           )}
 
           {/* List of Student Exam registrations */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-black uppercase text-gray-400 tracking-wide">
-              Registrations List
-            </h4>
+          (
+            <div className="space-y-3">
+              <h4 className="text-xs font-black uppercase text-gray-400 tracking-wide">
+                Registrations List
+              </h4>
 
             {filteredExamRecords.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 text-xs italic text-gray-400">
@@ -1693,10 +2057,12 @@ export default function ExamRecordsModule({
                         <div className="flex items-center gap-4 justify-between md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0" onClick={(e) => e.stopPropagation()}>
                           <div className="text-left md:text-right text-xs">
                             <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Combined Fee Balance</span>
-                            <span className={`font-mono font-extrabold ${remainingBalanceCombined <= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                              {remainingBalanceCombined <= 0 
-                                ? `Fully Paid (Rs. ${totalReceivedSum.toLocaleString()})` 
-                                : `Rs. ${remainingBalanceCombined.toLocaleString()} Outstanding`
+                            <span className={`font-mono font-extrabold ${remainingBalanceCombined <= 0 && totalFeeSum > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              {totalFeeSum === 0 && semestersList.every(s => s.totalFee === undefined)
+                                ? 'Fee Not Set'
+                                : remainingBalanceCombined <= 0 
+                                  ? `Fully Paid (Rs. ${totalReceivedSum.toLocaleString()})` 
+                                  : `Rs. ${remainingBalanceCombined.toLocaleString()} Outstanding`
                               }
                             </span>
                           </div>
@@ -1836,6 +2202,596 @@ export default function ExamRecordsModule({
               </div>
             )}
           </div>
+          )
+        </div>
+      )}
+              {/* STEP 5: EXAM MANAGER PAYMENT RECORDS */}
+      {step === 'payment_records' && selectedManager && (
+        <div className="space-y-6">
+          
+          {/* Payment Records Section Header */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h4 className={`text-xs font-black uppercase tracking-wide ${isGreen ? 'text-emerald-600' : 'text-sky-600'}`}>
+                Course Payment Records
+              </h4>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Define semester paper rates, courses, and compute due allowances for <strong>{selectedManager.name}</strong>.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStep('manager_options')}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 border border-gray-200 rounded-xl cursor-pointer"
+              >
+                Back to Options
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPaymentRecord(null);
+                  setPaymentSemester('Autumn');
+                  setPaymentYear('2026');
+                  setPaymentCourses([]);
+                  setFormCourseName('BA');
+                  setFormCustomCourseName('');
+                  setFormPerPaperRate('');
+                  setFormTotalPapers('');
+                  setFormEditingCourseId(null);
+                  setIsPaymentFormOpen(true);
+                }}
+                className={`px-4 py-1.5 text-xs font-bold text-white rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5 ${isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+              >
+                <Plus size={14} className="text-white font-bold" />
+                <span>Add Payment Record</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Payment Record Modal/Form Card */}
+          {isPaymentFormOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-6"
+            >
+              <div className="border-b border-gray-100 pb-3 flex justify-between items-center">
+                <h5 className={`text-xs font-black uppercase ${isGreen ? 'text-emerald-600' : 'text-sky-600'}`}>
+                  {editingPaymentRecord ? 'Modify Payment Record' : 'Create Payment Record'}
+                </h5>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaymentFormOpen(false);
+                    setEditingPaymentRecord(null);
+                  }}
+                  className="text-xs font-bold text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-150">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                    Semester *
+                  </label>
+                  <select
+                    required
+                    value={paymentSemester}
+                    onChange={(e) => setPaymentSemester(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-purple-500 bg-white text-gray-800 font-medium"
+                  >
+                    <option value="Autumn">Autumn</option>
+                    <option value="Spring">Spring</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                    Year *
+                  </label>
+                  <select
+                    required
+                    value={paymentYear}
+                    onChange={(e) => setPaymentYear(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-purple-500 bg-white text-gray-800 font-medium"
+                  >
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2028">2028</option>
+                    <option value="2029">2029</option>
+                    <option value="2030">2030</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                    S. No. (Auto-generated)
+                  </label>
+                  <div className="px-3 py-2 border border-gray-200 bg-gray-100 rounded-lg text-xs font-bold font-mono text-gray-600">
+                    S. No. {editingPaymentRecord ? editingPaymentRecord.serialNo : generateSerialNoForManager(selectedManager.id)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Course-wise list addition row */}
+              <div className="space-y-3 p-4 border border-gray-200 rounded-xl bg-white">
+                <h6 className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                  Course-wise Payment Details
+                </h6>
+
+                <div className="grid sm:grid-cols-4 gap-4 items-end">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                      Course/Program Name *
+                    </label>
+                    <select
+                      value={formCourseName}
+                      onChange={(e) => setFormCourseName(e.target.value)}
+                      className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-purple-500 bg-white text-gray-800 font-medium"
+                    >
+                      <option value="BA">BA</option>
+                      <option value="B.Com">B.Com</option>
+                      <option value="B.Ed">B.Ed</option>
+                      <option value="Other Programs">Other Programs</option>
+                    </select>
+                  </div>
+
+                  {formCourseName === 'Other Programs' && (
+                    <div className="sm:col-span-1">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                        Enter Program Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. BS Computer Science"
+                        value={formCustomCourseName}
+                        onChange={(e) => setFormCustomCourseName(e.target.value)}
+                        className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-purple-500 font-medium text-gray-800"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                      Per Paper Rate (Rs.) *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 150"
+                      value={formPerPaperRate}
+                      onChange={(e) => setFormPerPaperRate(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                      Total Papers *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 25"
+                      value={formTotalPapers}
+                      onChange={(e) => setFormTotalPapers(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAddCourseRow}
+                      className={`flex-1 px-4 py-2 text-xs font-bold text-white rounded-lg cursor-pointer transition-colors ${isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+                    >
+                      {formEditingCourseId ? 'Update Course' : 'Add Course'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Internal table of courses */}
+                <div className="border border-gray-150 rounded-xl overflow-hidden mt-4">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase border-b border-gray-150">
+                        <th className="p-3">Course Name</th>
+                        <th className="p-3">Per Paper Rate</th>
+                        <th className="p-3">Total Papers</th>
+                        <th className="p-3">Total Amount</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paymentCourses.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-4 text-center text-gray-400 italic">
+                            No courses added. Please complete the fields above and click "Add Course".
+                          </td>
+                        </tr>
+                      ) : (
+                        paymentCourses.map(c => (
+                          <tr key={c.id} className="hover:bg-gray-50/50">
+                            <td className="p-3 font-bold text-gray-800">{c.courseName}</td>
+                            <td className="p-3 font-mono">Rs. {c.perPaperRate.toLocaleString()}</td>
+                            <td className="p-3 font-mono">{c.totalPapers}</td>
+                            <td className="p-3 font-mono font-bold text-emerald-700">Rs. {c.totalAmount.toLocaleString()}</td>
+                            <td className="p-3 text-right flex justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleEditCourseRow(c)}
+                                className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-100"
+                              >
+                                <Edit size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCourseRow(c.id)}
+                                className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {paymentCourses.length > 0 && (
+                      <tfoot>
+                        <tr className="bg-gray-50/80 font-bold border-t border-gray-150 text-gray-800">
+                          <td colSpan={3} className="p-3 text-right uppercase tracking-wider text-[10px] font-black text-gray-400">
+                            Grand Total of All Course Amounts
+                          </td>
+                          <td colSpan={2} className={`p-3 font-mono font-black text-sm ${isGreen ? 'text-emerald-700' : 'text-sky-700'}`}>
+                            Rs. {paymentCourses.reduce((sum, c) => sum + c.totalAmount, 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaymentFormOpen(false);
+                    setEditingPaymentRecord(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-100 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePaymentRecord}
+                  className={`px-5 py-2 text-xs font-bold text-white rounded-lg cursor-pointer shadow-xs ${isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+                >
+                  Save Payment Record
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Search bar and Filters */}
+          <div className="bg-white p-4 rounded-xl border border-gray-150 flex items-center justify-between">
+            <div className="relative max-w-md w-full">
+              <input
+                type="text"
+                placeholder="Search by Semester, Year, Course Name..."
+                value={paymentSearchQuery}
+                onChange={(e) => setPaymentSearchQuery(e.target.value)}
+                className="w-full text-xs pl-9 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-hidden focus:ring-1 bg-white"
+              />
+              <div className="absolute left-3 top-2.5 text-gray-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+            </div>
+            <div className="text-[11px] text-gray-400 font-medium">
+              Showing {
+                paymentRecords
+                  .filter(r => r.managerId === selectedManager.id)
+                  .filter(r => {
+                    if (!paymentSearchQuery) return true;
+                    const q = paymentSearchQuery.toLowerCase();
+                    const semMatch = r.semester.toLowerCase().includes(q);
+                    const yearMatch = r.year.toLowerCase().includes(q);
+                    const courseMatch = r.courses?.some(c => c.courseName.toLowerCase().includes(q));
+                    return semMatch || yearMatch || courseMatch;
+                  }).length
+              } record(s)
+            </div>
+          </div>
+
+          {/* Payment Records List */}
+          {paymentRecords.filter(r => r.managerId === selectedManager.id).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-150 text-xs italic text-gray-400">
+              No payment records configured for this manager yet. Click "Add Payment Record" to begin.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paymentRecords
+                .filter(r => r.managerId === selectedManager.id)
+                .filter(r => {
+                  if (!paymentSearchQuery) return true;
+                  const q = paymentSearchQuery.toLowerCase();
+                  const semMatch = r.semester.toLowerCase().includes(q);
+                  const yearMatch = r.year.toLowerCase().includes(q);
+                  const courseMatch = r.courses?.some(c => c.courseName.toLowerCase().includes(q));
+                  return semMatch || yearMatch || courseMatch;
+                })
+                .map((rec) => {
+                  const isExpanded = expandedPaymentRecordId === rec.id;
+                  return (
+                    <div key={rec.id} className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-3xs divide-y divide-gray-150">
+                      {/* High level info card */}
+                      <div 
+                        onClick={() => setExpandedPaymentRecordId(isExpanded ? null : rec.id)}
+                        className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-xl font-mono text-xs font-black uppercase ${isGreen ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'}`}>
+                            S. No. {rec.serialNo}
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-black text-gray-900 uppercase">
+                              {rec.semester} {rec.year}
+                            </h5>
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              {rec.courses?.length || 0} program(s) configured
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-6 text-center md:text-right md:mr-6">
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Payable</span>
+                            <span className="text-xs font-mono font-black text-gray-800">Rs. {rec.grandTotal.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Paid Amount</span>
+                            <span className="text-xs font-mono font-black text-emerald-700">Rs. {rec.totalPaidAmount.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Remaining Due</span>
+                            <span className={`text-xs font-mono font-black ${rec.remainingAmountPayable > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+                              Rs. {rec.remainingAmountPayable.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPaymentRecord(rec);
+                              setPaymentSemester(rec.semester);
+                              setPaymentYear(rec.year);
+                              setPaymentCourses(rec.courses || []);
+                              setFormCourseName('BA');
+                              setFormCustomCourseName('');
+                              setFormPerPaperRate('');
+                              setFormTotalPapers('');
+                              setFormEditingCourseId(null);
+                              setIsPaymentFormOpen(true);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePaymentRecordClick(rec.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          <div className="p-1.5 text-gray-400">
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded details section */}
+                      {isExpanded && (
+                        <div className="bg-gray-50/30 p-5 space-y-6">
+                          
+                          {/* Course-wise details table */}
+                          <div className="space-y-2">
+                            <h6 className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                              Course-wise Payment Details
+                            </h6>
+                            <div className="bg-white rounded-xl border border-gray-150 overflow-hidden">
+                              <table className="w-full text-xs text-left">
+                                <thead>
+                                  <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase border-b border-gray-150">
+                                    <th className="p-3">Course Name</th>
+                                    <th className="p-3">Per Paper Rate</th>
+                                    <th className="p-3">Total Papers</th>
+                                    <th className="p-3">Total Amount</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {rec.courses?.map((c) => (
+                                    <tr key={c.id}>
+                                      <td className="p-3 font-bold text-gray-800">{c.courseName}</td>
+                                      <td className="p-3 font-mono text-gray-600">Rs. {c.perPaperRate.toLocaleString()}</td>
+                                      <td className="p-3 font-mono text-gray-600">{c.totalPapers}</td>
+                                      <td className="p-3 font-mono font-bold text-gray-800">Rs. {c.totalAmount.toLocaleString()}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-gray-50/50 font-bold border-t border-gray-150 text-gray-800">
+                                    <td colSpan={3} className="p-3 text-right text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                      Grand Total of Course Amounts
+                                    </td>
+                                    <td className="p-3 font-mono font-black text-sm text-gray-950">
+                                      Rs. {rec.grandTotal.toLocaleString()}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Payment Summary */}
+                          <div className="grid sm:grid-cols-3 gap-4">
+                            <div className="bg-white p-4 rounded-xl border border-gray-150 flex flex-col justify-between shadow-4xs">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Payable Amount</span>
+                              <span className="text-base font-black text-gray-900 font-mono mt-1">
+                                Rs. {rec.grandTotal.toLocaleString()}
+                              </span>
+                              <span className="text-[9px] text-gray-400 mt-1 italic">Allowance for all courses</span>
+                            </div>
+
+                            <div className="bg-white p-4 rounded-xl border border-gray-150 flex flex-col justify-between shadow-4xs">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Paid Amount</span>
+                              <span className="text-base font-black text-emerald-700 font-mono mt-1">
+                                Rs. {rec.totalPaidAmount.toLocaleString()}
+                              </span>
+                              <span className="text-[9px] text-gray-400 mt-1 italic">Sum of recorded payments</span>
+                            </div>
+
+                            <div className="bg-white p-4 rounded-xl border border-gray-150 flex flex-col justify-between shadow-4xs">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Remaining Amount Payable</span>
+                              <span className={`text-base font-black font-mono mt-1 ${rec.remainingAmountPayable > 0 ? 'text-amber-700' : 'text-gray-500'}`}>
+                                Rs. {rec.remainingAmountPayable.toLocaleString()}
+                              </span>
+                              <span className="text-[9px] text-gray-400 mt-1 italic">Total Payable − Total Paid</span>
+                            </div>
+                          </div>
+
+                          {/* Additional Payments Section */}
+                          <div className="space-y-4 pt-4 border-t border-gray-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div>
+                                <h6 className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                                  Additional Payment Entries
+                                </h6>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  Record cash or bank payments made to the exam manager.
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* List of payments */}
+                            <div className="bg-white rounded-xl border border-gray-150 overflow-hidden">
+                              <table className="w-full text-xs text-left">
+                                <thead>
+                                  <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase border-b border-gray-150">
+                                    <th className="p-3">Payment Date</th>
+                                    <th className="p-3">Payment Amount</th>
+                                    <th className="p-3">Remarks</th>
+                                    <th className="p-3 text-right">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {!rec.payments || rec.payments.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={4} className="p-4 text-center text-gray-400 italic">
+                                        No payments recorded yet for this semester.
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    rec.payments.map((p) => (
+                                      <tr key={p.id}>
+                                        <td className="p-3 font-mono font-medium text-gray-700">{p.date}</td>
+                                        <td className="p-3 font-mono font-black text-emerald-700">Rs. {p.amount.toLocaleString()}</td>
+                                        <td className="p-3 text-gray-500 italic font-medium">{p.remarks || '—'}</td>
+                                        <td className="p-3 text-right">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeletePaymentEntry(rec, p.id)}
+                                            className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100"
+                                            title="Delete Payment Entry"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Mini-form to add a payment */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-150 space-y-3">
+                              <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">
+                                Add Payment Record Later
+                              </span>
+                              <div className="grid sm:grid-cols-3 gap-4 items-end">
+                                <div>
+                                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                                    Payment Date *
+                                  </label>
+                                  <input
+                                    type="date"
+                                    required
+                                    value={newEntryDate}
+                                    onChange={(e) => setNewEntryDate(e.target.value)}
+                                    className="w-full text-xs px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-hidden text-gray-700"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                                    Payment Amount (Rs.) *
+                                  </label>
+                                  <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    placeholder="e.g. 10000"
+                                    value={newEntryAmount}
+                                    onChange={(e) => setNewEntryAmount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 0))}
+                                    className="w-full text-xs px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-hidden font-bold font-mono text-gray-800"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                                    Remarks / Notes (Optional)
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. Paid via cheque"
+                                      value={newEntryRemarks}
+                                      onChange={(e) => setNewEntryRemarks(e.target.value)}
+                                      className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-hidden text-gray-800"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddPaymentEntry(rec)}
+                                      className={`px-4 py-1.5 text-xs font-bold text-white rounded-lg cursor-pointer transition-colors ${isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+                                    >
+                                      Add Payment
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 

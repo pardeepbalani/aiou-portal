@@ -83,6 +83,37 @@ export interface ExamManager {
   phone: string;
   email: string;
   centre: 'Mithi' | 'Diplo';
+  totalPaidAmount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoursePaymentDetails {
+  id: string;
+  courseName: string;
+  perPaperRate: number;
+  totalPapers: number;
+  totalAmount: number;
+}
+
+export interface ManagerPaymentEntry {
+  id: string;
+  date: string;
+  amount: number;
+  remarks?: string;
+}
+
+export interface ExamManagerPaymentRecord {
+  id: string;
+  managerId: string;
+  semester: string;
+  year: string;
+  serialNo: number;
+  courses: CoursePaymentDetails[];
+  grandTotal: number;
+  payments: ManagerPaymentEntry[];
+  totalPaidAmount: number;
+  remainingAmountPayable: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -106,7 +137,7 @@ export interface StudentExamSemester {
   semesterTerm: string;
   courseCodes: string[];
   examDates: CourseExamDate[];
-  totalFee: number;
+  totalFee?: number;
   amountReceived: number;
   paymentHistory: ExamPaymentHistory[];
 }

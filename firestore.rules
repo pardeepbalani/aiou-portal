@@ -55,6 +55,17 @@ service cloud.firestore {
         && data.phone is string && data.phone.size() <= 32
         && data.email is string && data.email.size() <= 256
         && (data.centre == 'Mithi' || data.centre == 'Diplo')
+        && (!('totalPaidAmount' in data) || data.totalPaidAmount is int || data.totalPaidAmount is float)
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    // Hardened validation function representing the ExamManagerPaymentRecord schema
+    function isValidExamManagerPaymentRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.managerId is string && data.managerId.size() <= 128
+        && data.courseCode is string && data.courseCode.size() <= 128
+        && (data.perPaperCharges is int || data.perPaperCharges is float)
         && data.createdAt is string
         && data.updatedAt is string;
     }
@@ -174,6 +185,23 @@ service cloud.firestore {
         && isValidExamManager(incoming());
 
       allow delete: if isValidId(managerId);
+    }
+
+    // Rules for exam_manager_payments collection
+    match /exam_manager_payments/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidExamManagerPaymentRecord(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidExamManagerPaymentRecord(incoming());
+
+      allow delete: if isValidId(recordId);
     }
 
     // Rules for exam_records collection

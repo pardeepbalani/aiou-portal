@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
   collection, 
   doc, 
   setDoc, 
@@ -11,7 +12,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord, ExamManagerPaymentRecord } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -30,13 +31,12 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore safely to prevent app startup crash if custom database is not yet fully provisioned
 let initialDb: any;
 try {
-  if (firebaseConfig.firestoreDatabaseId) {
-    initialDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-  } else {
-    initialDb = getFirestore(app);
-  }
+  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+  initialDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  }, dbId);
 } catch (e) {
-  console.warn("Failed to initialize firestore with custom database ID, falling back to default:", e);
+  console.warn("Failed to initialize firestore with custom database ID and long polling, falling back to default:", e);
   try {
     initialDb = getFirestore(app);
   } catch (err2) {
@@ -1049,6 +1049,125 @@ export async function deleteResearchProjectRecord(id: string): Promise<void> {
     setQuotaExceeded(false); // Self-healing
   } catch (error) {
     console.error('Firestore delete failed for Research Project Record:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+// ==========================================
+// EXAM MANAGER PAYMENT RECORDS LOGIC
+// ==========================================
+const EXAM_MANAGER_PAYMENTS_COLLECTION = 'exam_manager_payments';
+const LOCAL_EXAM_MANAGER_PAYMENTS_KEY = 'aiou_local_exam_manager_payments';
+
+export function getLocalExamManagerPaymentRecords(): ExamManagerPaymentRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_EXAM_MANAGER_PAYMENTS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(EXAM_MANAGER_PAYMENTS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local manager payment records:', error);
+    return [];
+  }
+}
+
+export function saveLocalExamManagerPaymentRecords(records: ExamManagerPaymentRecord[]): void {
+  try {
+    const deletedIds = getDeletedIds(EXAM_MANAGER_PAYMENTS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_EXAM_MANAGER_PAYMENTS_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local manager payment records:', error);
+  }
+}
+
+export async function saveExamManagerPaymentRecord(record: ExamManagerPaymentRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord: ExamManagerPaymentRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  // Remove from deleted tracking if present
+  removeDeletedId(EXAM_MANAGER_PAYMENTS_COLLECTION, updatedRecord.id);
+
+  const local = getLocalExamManagerPaymentRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalExamManagerPaymentRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, EXAM_MANAGER_PAYMENTS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.warn('Firestore write failed for Exam Manager Payment Record, using local fallback. Error:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncExamManagerPaymentRecords(): Promise<ExamManagerPaymentRecord[]> {
+  const deletedIds = getDeletedIds(EXAM_MANAGER_PAYMENTS_COLLECTION);
+  let remoteRecords: ExamManagerPaymentRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, EXAM_MANAGER_PAYMENTS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false); // Self-healing
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as ExamManagerPaymentRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for Exam Manager Payment Records. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalExamManagerPaymentRecords();
+  }
+
+  const local = getLocalExamManagerPaymentRecords();
+  const mergedMap = new Map<string, ExamManagerPaymentRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalExamManagerPaymentRecords(merged);
+  return merged;
+}
+
+export async function deleteExamManagerPaymentRecord(id: string): Promise<void> {
+  // Add to deleted tracking
+  addDeletedId(EXAM_MANAGER_PAYMENTS_COLLECTION, id);
+
+  const local = getLocalExamManagerPaymentRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalExamManagerPaymentRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, EXAM_MANAGER_PAYMENTS_COLLECTION, id));
+    setQuotaExceeded(false); // Self-healing
+  } catch (error) {
+    console.error('Firestore delete failed for Exam Manager Payment Record:', error);
     setQuotaExceeded(true);
   }
 }

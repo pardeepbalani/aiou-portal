@@ -115,6 +115,7 @@
         "phone": { "type": "string" },
         "email": { "type": "string" },
         "centre": { "type": "string", "enum": ["Mithi", "Diplo"] },
+        "totalPaidAmount": { "type": "number" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
@@ -227,6 +228,20 @@
         "id", "semester", "year", "studentName", "registrationId", "researchTopic",
         "topicApprovalDate", "supervisorName", "supervisorContact", "dueDate", "createdAt", "updatedAt"
       ]
+    },
+    "ExamManagerPaymentRecord": {
+      "title": "ExamManagerPaymentRecord",
+      "description": "Per course paper charge details for exam managers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "managerId": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "perPaperCharges": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "managerId", "courseCode", "perPaperCharges", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -253,6 +268,10 @@
     "/research_project_records/{recordId}": {
       "schema": "ResearchProjectRecord",
       "description": "Collection storing student research project registration records and supervisors"
+    },
+    "/exam_manager_payments/{recordId}": {
+      "schema": "ExamManagerPaymentRecord",
+      "description": "Collection storing per course paper charge details for exam managers"
     }
   }
 }
