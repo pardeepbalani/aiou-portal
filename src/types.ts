@@ -235,6 +235,9 @@ export interface StudentQuizRecord {
   status: 'Pending' | 'Completed' | 'Overdue';
   programSelected?: string;
   remarks?: string;
+  semester?: 'Spring' | 'Autumn';
+  year?: string;
+  batch?: string;
   createdAt: string;
   updatedAt: string;
 }

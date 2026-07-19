@@ -56,6 +56,7 @@ export default function QuizMgtModule({
   // Quiz Form state
   const [showForm, setShowForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState<StudentQuizRecord | null>(null);
+  const [formStep, setFormStep] = useState<'selection' | 'details'>('selection');
   
   // Selected student from main directory
   const [selectedMainStudentId, setSelectedMainStudentId] = useState<string>('');
@@ -75,6 +76,9 @@ export default function QuizMgtModule({
   const [programSelected, setProgramSelected] = useState('B.Ed (1.5 Years)');
   const [remarks, setRemarks] = useState('');
   const [addToMainDirectory, setAddToMainDirectory] = useState(false);
+  const [quizSemester, setQuizSemester] = useState<'Spring' | 'Autumn' | ''>('');
+  const [quizYear, setQuizYear] = useState('');
+  const [quizBatch, setQuizBatch] = useState('');
 
   // Real-time tick-tock for 2-hour action alarms
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -177,6 +181,9 @@ export default function QuizMgtModule({
       status: editingRecord ? (status as any) : 'Pending',
       programSelected,
       remarks: remarks.trim(),
+      semester: quizSemester || undefined,
+      year: quizYear || undefined,
+      batch: quizBatch || undefined,
       createdAt: editingRecord ? editingRecord.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -245,6 +252,10 @@ export default function QuizMgtModule({
       setProgramSelected('B.Ed (1.5 Years)');
       setRemarks('');
       setAddToMainDirectory(false);
+      setQuizSemester('Spring');
+      setQuizYear(new Date().getFullYear().toString());
+      setQuizBatch('');
+      setFormStep('selection');
       
       // Reload records
       loadQuizRecords();
@@ -270,6 +281,10 @@ export default function QuizMgtModule({
     setStatus(rec.status === 'Overdue' ? 'Pending' : rec.status as any);
     setProgramSelected(rec.programSelected || 'B.Ed (1.5 Years)');
     setRemarks(rec.remarks || '');
+    setQuizSemester(rec.semester || 'Spring');
+    setQuizYear(rec.year || new Date().getFullYear().toString());
+    setQuizBatch(rec.batch || '');
+    setFormStep('details');
     setSelectedMainStudentId('');
     setAddToMainDirectory(false);
     setShowForm(true);
@@ -465,6 +480,10 @@ export default function QuizMgtModule({
             setStatus('Pending');
             setRemarks('');
             setAddToMainDirectory(false);
+            setQuizSemester('Spring');
+            setQuizYear(new Date().getFullYear().toString());
+            setQuizBatch('');
+            setFormStep('selection');
             setShowForm(true);
           }}
           className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${
@@ -609,217 +628,342 @@ export default function QuizMgtModule({
               </button>
             </div>
 
-            <form onSubmit={handleSaveQuiz} className="space-y-4 text-xs">
-              
-              {/* Optional Quick lookup dropdown of previously enrolled students */}
-              {!editingRecord && (
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    Quick Fill: Link Previously Enrolled Student
-                  </label>
-                  <select
-                    value={selectedMainStudentId}
-                    onChange={(e) => setSelectedMainStudentId(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-hidden"
+            {formStep === 'selection' ? (
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl space-y-4">
+                  <p className="text-gray-500 font-medium">
+                    To schedule a quiz, first specify the target academic scope.
+                  </p>
+
+                  {/* Semester Choice */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                      Semester *
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(['Spring', 'Autumn'] as const).map(sem => (
+                        <button
+                          key={sem}
+                          type="button"
+                          onClick={() => setQuizSemester(sem)}
+                          className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            quizSemester === sem
+                              ? isGreen 
+                                ? 'bg-emerald-600 text-white shadow-xs border-transparent' 
+                                : 'bg-sky-600 text-white shadow-xs border-transparent'
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {sem}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Year Choice */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                      Year *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 2026"
+                      value={quizYear}
+                      onChange={(e) => setQuizYear(e.target.value)}
+                      className="w-full p-2.5 border border-gray-250 rounded-xl bg-white text-xs font-medium focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Batch Choice */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                      Batch *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Batch 1, Batch 2, or 1, 2, 3..."
+                      value={quizBatch}
+                      onChange={(e) => setQuizBatch(e.target.value)}
+                      className="w-full p-2.5 border border-gray-250 rounded-xl bg-white text-xs font-medium focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 transition-colors cursor-pointer"
                   >
-                    <option value="">-- Or enter new student details manually below --</option>
-                    {studentRecords.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.studentName} ({s.registrationId}) - {s.programSelected}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Student Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="Enter student name"
-                    className="w-full p-2.5 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Father's Name</label>
-                  <input
-                    type="text"
-                    value={fatherName}
-                    onChange={(e) => setFatherName(e.target.value)}
-                    placeholder="Enter father's name"
-                    className="w-full p-2.5 border border-gray-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Student ID / Reg ID *</label>
-                  <input
-                    type="text"
-                    required
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    placeholder="e.g. 23FPA09511"
-                    className="w-full p-2.5 border border-gray-300 rounded-lg uppercase"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Academic Program *</label>
-                  <select
-                    value={programSelected}
-                    onChange={(e) => setProgramSelected(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
-                  >
-                    {PROGRAM_OPTIONS.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Contact Number</label>
-                  <input
-                    type="text"
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                    placeholder="e.g. 03001234567"
-                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz Start Date (From) *</label>
-                  <input
-                    type="date"
-                    required
-                    value={quizDateFrom || quizDate}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setQuizDateFrom(val);
-                      setQuizDate(val);
-                      if (!quizDateTo) setQuizDateTo(val);
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!quizSemester) {
+                        triggerToast('Please select a Semester.');
+                        return;
+                      }
+                      if (!quizYear.trim()) {
+                        triggerToast('Please enter a Year.');
+                        return;
+                      }
+                      if (!quizBatch.trim()) {
+                        triggerToast('Please enter a Batch.');
+                        return;
+                      }
+                      setFormStep('details');
                     }}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
-                  />
+                    className={`px-5 py-2 rounded-lg font-bold text-white transition-all cursor-pointer ${
+                      isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+                    }`}
+                  >
+                    Proceed
+                  </button>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz End Date (To) *</label>
-                  <input
-                    type="date"
-                    required
-                    value={quizDateTo || quizDateFrom || quizDate}
-                    onChange={(e) => setQuizDateTo(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Course Code *</label>
-                  <input
-                    type="text"
-                    required
-                    value={courseCode}
-                    onChange={(e) => setCourseCode(e.target.value)}
-                    placeholder="e.g. 8601"
-                    className="w-full p-2.5 border border-gray-300 rounded-lg uppercase font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz Start Time (24h) *</label>
-                  <input
-                    type="time"
-                    required
-                    value={quizStartTime}
-                    onChange={(e) => setQuizStartTime(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-gray-550">Quiz End Time (24h) *</label>
-                  <input
-                    type="time"
-                    required
-                    value={quizEndTime}
-                    onChange={(e) => setQuizEndTime(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {editingRecord ? (
-                  <div className="space-y-1 col-span-2">
-                    <label className="block text-[11px] font-extrabold text-gray-550">Quiz Status</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as any)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
+            ) : (
+              <form onSubmit={handleSaveQuiz} className="space-y-4 text-xs">
+                
+                {/* Active Scope Card */}
+                <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs ${
+                  isGreen 
+                    ? 'bg-emerald-50/50 border-emerald-100 text-emerald-950' 
+                    : 'bg-sky-50/50 border-sky-100 text-sky-950'
+                }`}>
+                  <div>
+                    <span className="font-extrabold uppercase text-[9px] tracking-wider text-gray-400 block mb-0.5">Quiz Target Scope</span>
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span>{quizSemester} {quizYear}</span>
+                      <span className="w-1 h-1 rounded-full bg-gray-300" />
+                      <span>{quizBatch}</span>
+                    </span>
+                  </div>
+                  {!editingRecord && (
+                    <button
+                      type="button"
+                      onClick={() => setFormStep('selection')}
+                      className={`text-[11px] font-black underline cursor-pointer hover:opacity-80 ${
+                        isGreen ? 'text-emerald-700' : 'text-sky-700'
+                      }`}
                     >
-                      <option value="Pending">Pending</option>
-                      <option value="Completed">Completed</option>
+                      Change Selection
+                    </button>
+                  )}
+                </div>
+
+                {/* Optional Quick lookup dropdown of previously enrolled students */}
+                {!editingRecord && (
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      Quick Fill: Link Previously Enrolled Student
+                    </label>
+                    <select
+                      value={selectedMainStudentId}
+                      onChange={(e) => setSelectedMainStudentId(e.target.value)}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-hidden"
+                    >
+                      <option value="">-- Or enter new student details manually below --</option>
+                      {studentRecords.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.studentName} ({s.registrationId}) - {s.programSelected}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                ) : null}
-              </div>
+                )}
 
-              <div className="space-y-1">
-                <label className="block text-[11px] font-extrabold text-gray-550">Remarks / Instructions</label>
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g. Requires assistance with portal login checks."
-                  rows={2}
-                  className="w-full p-2.5 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              {/* Checkbox to add to main student directory if manual input */}
-              {!editingRecord && !selectedMainStudentId && (
-                <div className="p-3 bg-gray-50 border border-gray-150 rounded-xl flex items-start gap-2.5">
-                  <input
-                    type="checkbox"
-                    id="addToMainDir"
-                    checked={addToMainDirectory}
-                    onChange={(e) => setAddToMainDirectory(e.target.checked)}
-                    className="mt-0.5 rounded cursor-pointer text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <label htmlFor="addToMainDir" className="text-[11px] text-gray-600 font-medium leading-relaxed cursor-pointer select-none">
-                    <strong>Save to Main Student Directory</strong><br />
-                    This will register the student into the previously enrolled directory for global search lookup as well.
-                  </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Student Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      placeholder="Enter student name"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Father's Name</label>
+                    <input
+                      type="text"
+                      value={fatherName}
+                      onChange={(e) => setFatherName(e.target.value)}
+                      placeholder="Enter father's name"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg"
+                    />
+                  </div>
                 </div>
-              )}
 
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`px-5 py-2 rounded-lg font-bold text-white transition-all cursor-pointer ${
-                    isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
-                  }`}
-                >
-                  Save Schedule
-                </button>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Student ID / Reg ID *</label>
+                    <input
+                      type="text"
+                      required
+                      value={studentId}
+                      onChange={(e) => setStudentId(e.target.value)}
+                      placeholder="e.g. 23FPA09511"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg uppercase"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Academic Program *</label>
+                    <select
+                      value={programSelected}
+                      onChange={(e) => setProgramSelected(e.target.value)}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
+                    >
+                      {PROGRAM_OPTIONS.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-            </form>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Contact Number</label>
+                    <input
+                      type="text"
+                      value={contactNumber}
+                      onChange={(e) => setContactNumber(e.target.value)}
+                      placeholder="e.g. 03001234567"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Quiz Start Date (From) *</label>
+                    <input
+                      type="date"
+                      required
+                      value={quizDateFrom || quizDate}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setQuizDateFrom(val);
+                        setQuizDate(val);
+                        if (!quizDateTo) setQuizDateTo(val);
+                      }}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Quiz End Date (To) *</label>
+                    <input
+                      type="date"
+                      required
+                      value={quizDateTo || quizDateFrom || quizDate}
+                      onChange={(e) => setQuizDateTo(e.target.value)}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Course Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={courseCode}
+                      onChange={(e) => setCourseCode(e.target.value)}
+                      placeholder="e.g. 8601"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg uppercase font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Quiz Start Time (24h) *</label>
+                    <input
+                      type="time"
+                      required
+                      value={quizStartTime}
+                      onChange={(e) => setQuizStartTime(e.target.value)}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-extrabold text-gray-550">Quiz End Time (24h) *</label>
+                    <input
+                      type="time"
+                      required
+                      value={quizEndTime}
+                      onChange={(e) => setQuizEndTime(e.target.value)}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {editingRecord ? (
+                    <div className="space-y-1 col-span-2">
+                      <label className="block text-[11px] font-extrabold text-gray-550">Quiz Status</label>
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as any)}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg bg-white"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-extrabold text-gray-550">Remarks / Instructions</label>
+                  <textarea
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="e.g. Requires assistance with portal login checks."
+                    rows={2}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg"
+                  />
+                </div>
+
+                {/* Checkbox to add to main student directory if manual input */}
+                {!editingRecord && !selectedMainStudentId && (
+                  <div className="p-3 bg-gray-50 border border-gray-150 rounded-xl flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="addToMainDir"
+                      checked={addToMainDirectory}
+                      onChange={(e) => setAddToMainDirectory(e.target.checked)}
+                      className="mt-0.5 rounded cursor-pointer text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <label htmlFor="addToMainDir" className="text-[11px] text-gray-600 font-medium leading-relaxed cursor-pointer select-none">
+                      <strong>Save to Main Student Directory</strong><br />
+                      This will register the student into the previously enrolled directory for global search lookup as well.
+                    </label>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`px-5 py-2 rounded-lg font-bold text-white transition-all cursor-pointer ${
+                      isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+                    }`}
+                  >
+                    Save Schedule
+                  </button>
+                </div>
+
+              </form>
+            )}
           </motion.div>
         </div>
       )}
@@ -919,8 +1063,31 @@ export default function QuizMgtModule({
                       <td className="py-3.5 px-4">
                         <div>
                           <span className="font-extrabold text-gray-900 block">{rec.studentName}</span>
+                          {(rec.semester || rec.year || rec.batch) && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {rec.semester && (
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
+                                  isGreen 
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' 
+                                    : 'bg-sky-50 text-sky-700 border border-sky-150'
+                                }`}>
+                                  {rec.semester}
+                                </span>
+                              )}
+                              {rec.year && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase bg-gray-100 text-gray-700 border border-gray-200">
+                                  {rec.year}
+                                </span>
+                              )}
+                              {rec.batch && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase bg-purple-50 text-purple-700 border border-purple-150">
+                                  {rec.batch}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           {rec.contactNumber && (
-                            <span className="text-[10px] text-gray-450 font-mono flex items-center gap-1 mt-0.5">
+                            <span className="text-[10px] text-gray-450 font-mono flex items-center gap-1 mt-1.5">
                               <Phone size={10} />
                               <span>{rec.contactNumber}</span>
                             </span>
