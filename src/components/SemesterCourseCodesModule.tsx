@@ -300,11 +300,11 @@ export default function SemesterCourseCodesModule({
                 <div className="divide-y divide-gray-100">
                   {selectedStudent.semesters
                     .sort((a, b) => a.semesterNumber - b.semesterNumber)
-                    .map((sem) => {
+                    .map((sem, sIdx) => {
                       const coursesList = sem.courses || [];
                       return (
                         <div 
-                          key={sem.semesterNumber} 
+                          key={`distribution-sem-${sem.semesterNumber}-${sIdx}`} 
                           className="p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-gray-50/30 transition-colors"
                         >
                           {/* Semester Number Tag */}

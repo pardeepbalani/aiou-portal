@@ -766,8 +766,8 @@ export default function QuizMgtModule({
                       className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-hidden"
                     >
                       <option value="">-- Or enter new student details manually below --</option>
-                      {studentRecords.map(s => (
-                        <option key={s.id} value={s.id}>
+                      {studentRecords.map((s, idx) => (
+                        <option key={`quiz-student-${s.id || idx}-${idx}`} value={s.id}>
                           {s.studentName} ({s.registrationId}) - {s.programSelected}
                         </option>
                       ))}

@@ -823,7 +823,7 @@ export default function StudentDetails({
               </span>
             </div>
 
-            {student.semesters.map((sem) => {
+            {student.semesters.map((sem, sIdx) => {
               // Count completed courses
               const activeCourses = sem.courses.filter(c => c.code.trim());
               const completedCount = sem.courses.reduce((sum, c) => {
@@ -845,7 +845,7 @@ export default function StudentDetails({
               const semesterProgress = totalChecks > 0 ? Math.round((checkedCount / totalChecks) * 100) : 0;
 
               return (
-                <div key={sem.semesterNumber} className="border border-gray-200 rounded-xl p-4 bg-gray-50/20">
+                <div key={`sem-card-${sem.semesterNumber}-${sIdx}`} className="border border-gray-200 rounded-xl p-4 bg-gray-50/20">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-dashed border-gray-200 pb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-extrabold text-sm text-gray-800">
@@ -871,7 +871,7 @@ export default function StudentDetails({
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {activeCourses.map((course, cIdx) => (
-                        <div key={cIdx} className="bg-white p-3 rounded-lg border border-gray-200 text-xs space-y-2 shadow-3xs">
+                        <div key={`course-card-${course.code || cIdx}-${cIdx}`} className="bg-white p-3 rounded-lg border border-gray-200 text-xs space-y-2 shadow-3xs">
                           <div className="flex items-center justify-between border-b pb-1">
                             <span className="font-black text-gray-900 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">
                               Course Code: {course.code}
@@ -1033,7 +1033,7 @@ export default function StudentDetails({
                             {sem.paymentsList && sem.paymentsList.length > 0 ? (
                               <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                                 {sem.paymentsList.map((p, pIdx) => (
-                                  <div key={p.id || pIdx} className="flex justify-between items-center text-[9px] py-0.5 border-b border-gray-100 last:border-0">
+                                  <div key={`pay-${p.id || pIdx}-${pIdx}`} className="flex justify-between items-center text-[9px] py-0.5 border-b border-gray-100 last:border-0">
                                     <span className="text-gray-600 font-bold">{p.date}:</span>
                                     <span className="text-emerald-700 font-extrabold">Rs. {p.amount.toLocaleString()}</span>
                                   </div>
@@ -1213,7 +1213,7 @@ export default function StudentDetails({
                     {sem.paymentsList && sem.paymentsList.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto mt-2">
                         {sem.paymentsList.map((p, pIdx) => (
-                          <div key={p.id || pIdx} className="bg-white p-2 rounded-lg border border-gray-200 flex justify-between items-center text-xs">
+                          <div key={`ledger-${p.id || pIdx}-${pIdx}`} className="bg-white p-2 rounded-lg border border-gray-200 flex justify-between items-center text-xs">
                             <div>
                               <span className="font-extrabold text-gray-800">Rs. {p.amount.toLocaleString()}</span>
                               <span className="block text-[9px] text-gray-400 font-mono">Date: {p.date} {p.voucherRef ? `| Ref: ${p.voucherRef}` : ''}</span>

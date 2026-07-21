@@ -202,7 +202,23 @@ export default function ExamRecordsModule({
           semesters: [legacySem]
         };
       }
-      return rec;
+      // Ensure each semester has a unique, non-empty ID
+      const seenIds = new Set<string>();
+      const fixedSemesters = rec.semesters.map((s, idx) => {
+        let semId = s.id;
+        if (!semId || seenIds.has(semId)) {
+          semId = `sem-fixed-${idx}-${Math.random().toString(36).substr(2, 9)}`;
+        }
+        seenIds.add(semId);
+        return {
+          ...s,
+          id: semId
+        };
+      });
+      return {
+        ...rec,
+        semesters: fixedSemesters
+      };
     });
     setExamRecords(normalized);
   };
@@ -448,6 +464,20 @@ export default function ExamRecordsModule({
         amountReceived: info.amountReceived || 0,
         paymentHistory: info.paymentHistory || []
       }];
+    } else {
+      // Ensure each has a unique ID in case they don't
+      const seenIds = new Set<string>();
+      sems = sems.map((s, idx) => {
+        let semId = s.id;
+        if (!semId || seenIds.has(semId)) {
+          semId = `sem-fixed-${idx}-${Math.random().toString(36).substr(2, 9)}`;
+        }
+        seenIds.add(semId);
+        return {
+          ...s,
+          id: semId
+        };
+      });
     }
 
     setFormSemesters(sems);
@@ -882,7 +912,8 @@ export default function ExamRecordsModule({
       
       // Auto pre-populate courses from their first semester if available
       const firstSem = student.semesters?.[0];
-      const codes = firstSem?.courses?.map(c => c.code).filter(Boolean) || [];
+      const rawCodes = firstSem?.courses?.map(c => c.code).filter(Boolean) || [];
+      const codes = Array.from(new Set(rawCodes));
       setSelectedEnrollmentSemester(firstSem ? firstSem.semesterNumber : '');
       
       const initialSemId = `sem-${Math.random().toString(36).substr(2, 9)}`;
@@ -932,7 +963,8 @@ export default function ExamRecordsModule({
     // Find matching semester data
     const semData = selectedPrefillStudent.semesters?.find(s => s.semesterNumber === semNum);
     if (semData) {
-      const codes = semData.courses?.map(c => c.code).filter(Boolean) || [];
+      const rawCodes = semData.courses?.map(c => c.code).filter(Boolean) || [];
+      const codes = Array.from(new Set(rawCodes));
       
       // Load all codes into active state
       setExamCourseCodes(codes);
@@ -1604,8 +1636,8 @@ export default function ExamRecordsModule({
                       className="text-xs px-2.5 py-1 border border-emerald-200 rounded-lg bg-emerald-50/40 text-emerald-800 font-bold focus:outline-hidden"
                     >
                       <option value="">-- Choose Enrolled Student --</option>
-                      {studentRecords.map(student => (
-                        <option key={student.id} value={student.id}>
+                      {studentRecords.map((student, idx) => (
+                        <option key={`student-prefill-${student.id || idx}-${idx}`} value={student.id}>
                           {student.studentName} ({student.registrationId || 'No Reg'})
                         </option>
                       ))}
@@ -1714,11 +1746,11 @@ export default function ExamRecordsModule({
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2 border-b border-gray-100 pb-2">
-                        {formSemesters.map((sem) => {
+                        {formSemesters.map((sem, sIdx) => {
                           const isActive = sem.id === activeFormSemId;
                           return (
                             <button
-                              key={sem.id}
+                              key={`form-sem-${sem.id || sIdx}-${sIdx}`}
                               type="button"
                               onClick={() => selectSemester(sem.id)}
                               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
@@ -1802,11 +1834,11 @@ export default function ExamRecordsModule({
 
                       {/* Semester Selectors */}
                       <div className="flex flex-wrap gap-2">
-                        {(selectedPrefillStudent.semesters || []).map((sem) => {
+                        {(selectedPrefillStudent.semesters || []).map((sem, index) => {
                           const isCurrentSelected = selectedEnrollmentSemester === sem.semesterNumber;
                           return (
                             <button
-                              key={sem.semesterNumber}
+                              key={`sem-selector-${sem.semesterNumber}-${index}`}
                               type="button"
                               onClick={() => handleEnrollmentSemesterChange(sem.semesterNumber)}
                               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
@@ -1847,11 +1879,11 @@ export default function ExamRecordsModule({
                                   </p>
                                 );
                               }
-                              return courses.map(course => {
+                              return courses.map((course, idx) => {
                                 const isChecked = examCourseCodes.includes(course.code);
                                 return (
                                   <button
-                                    key={course.code}
+                                    key={`course-prefill-${course.code || idx}-${idx}`}
                                     type="button"
                                     onClick={() => {
                                       if (isChecked) {
@@ -1936,9 +1968,9 @@ export default function ExamRecordsModule({
                       </div>
 
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {examCourseCodes.map(code => (
+                        {examCourseCodes.map((code, idx) => (
                           <span 
-                            key={code}
+                            key={`exam-course-code-${code}-${idx}`}
                             className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-purple-50 text-purple-800 border border-purple-200 px-2 py-1 rounded-md"
                           >
                             <span>Course {code}</span>
@@ -1964,14 +1996,14 @@ export default function ExamRecordsModule({
                         <p className="text-xs text-gray-400 italic">Add course codes first to schedule exam dates.</p>
                       ) : (
                         <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                          {examCourseCodes.map(code => {
+                          {examCourseCodes.map((code, idx) => {
                             const foundItem = examDatesList.find(d => d.courseCode === code);
                             const examDateVal = foundItem?.examDate || '';
                             const statusVal = foundItem?.status || 'Pending';
                             const reappearDateVal = foundItem?.reappearDate || '';
                             const remarksVal = foundItem?.remarks || '';
                             return (
-                              <div key={code} className="p-3 bg-white border border-gray-150 rounded-xl space-y-2.5 shadow-3xs">
+                              <div key={`exam-date-field-${code}-${idx}`} className="p-3 bg-white border border-gray-150 rounded-xl space-y-2.5 shadow-3xs">
                                 <div className="flex items-center justify-between">
                                   <span className="font-extrabold text-gray-800 font-mono text-xs">Course {code}</span>
                                   <button
@@ -2126,8 +2158,8 @@ export default function ExamRecordsModule({
                         <p className="text-xs text-gray-400 italic">No payments recorded yet.</p>
                       ) : (
                         <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 text-xs">
-                          {paymentHistory.map(pay => (
-                            <div key={pay.id} className="flex justify-between items-center gap-2 p-1.5 bg-white rounded border border-gray-150">
+                          {paymentHistory.map((pay, pIdx) => (
+                            <div key={`form-pay-${pay.id || pIdx}-${pIdx}`} className="flex justify-between items-center gap-2 p-1.5 bg-white rounded border border-gray-150">
                               <span className="text-[10px] text-gray-400 font-mono font-bold">{pay.date}</span>
                               <span className="font-black text-emerald-800 font-mono">Rs. {pay.amount.toLocaleString()}</span>
                               <button
@@ -2226,8 +2258,8 @@ export default function ExamRecordsModule({
                             
                             {/* Semesters Badges */}
                             <div className="flex flex-wrap gap-1">
-                              {semestersList.map(s => (
-                                <span key={s.id} className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
+                              {semestersList.map((s, sIdx) => (
+                                <span key={`badge-${s.id || sIdx}-${sIdx}`} className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
                                   {s.semesterTerm}
                                 </span>
                               ))}
@@ -2310,7 +2342,7 @@ export default function ExamRecordsModule({
                               {(semestersList.length > 0 ? semestersList : [activeSem]).map((sem, sIdx) => {
                                 const outstanding = (sem.totalFee || 0) - (sem.amountReceived || 0);
                                 return (
-                                  <div key={sem.id || sIdx} className="bg-white p-4 rounded-xl border border-gray-150 shadow-3xs space-y-3">
+                                  <div key={`expanded-sem-${sem.id || sIdx}-${sIdx}`} className="bg-white p-4 rounded-xl border border-gray-150 shadow-3xs space-y-3">
                                     <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                                       <span className="font-extrabold text-xs text-purple-950 font-mono">
                                         Semester: {sem.semesterTerm}
@@ -2334,7 +2366,7 @@ export default function ExamRecordsModule({
                                         <p className="text-[10px] text-gray-400 italic">No courses registered for this semester.</p>
                                       ) : (
                                         <div className="grid gap-2">
-                                          {sem.courseCodes?.map(code => {
+                                          {sem.courseCodes?.map((code, cIdx) => {
                                             const matchDate = sem.examDates?.find(d => d.courseCode === code);
                                             const status = matchDate?.status || 'Pending';
                                             const dateVal = matchDate?.examDate || 'Not Set';
@@ -2346,7 +2378,7 @@ export default function ExamRecordsModule({
                                             if (status === 'Failed') statStyle = 'bg-red-50 text-red-700 border-red-100';
 
                                             return (
-                                              <div key={code} className={`p-2 rounded-lg border text-[10px] ${statStyle} flex flex-col gap-0.5`}>
+                                              <div key={`expanded-course-${code}-${cIdx}`} className={`p-2 rounded-lg border text-[10px] ${statStyle} flex flex-col gap-0.5`}>
                                                 <div className="flex items-center justify-between font-bold">
                                                   <span>Course {code}</span>
                                                   <span className="text-[8px] font-black uppercase font-mono bg-white/70 px-1 py-0.2 rounded shadow-4xs border border-current/10">
