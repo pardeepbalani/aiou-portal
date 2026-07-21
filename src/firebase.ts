@@ -12,7 +12,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord, ExamManagerPaymentRecord } from './types';
+import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord, ExamManagerPaymentRecord, F2FManager, F2FCandidateRecord, F2FManagerPaymentRecord } from './types';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -1168,6 +1168,355 @@ export async function deleteExamManagerPaymentRecord(id: string): Promise<void> 
     setQuotaExceeded(false); // Self-healing
   } catch (error) {
     console.error('Firestore delete failed for Exam Manager Payment Record:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+// ==========================================
+// F2F Workshop Management Persistence & Sync
+// ==========================================
+
+const F2F_MANAGERS_COLLECTION = 'f2f_managers';
+const LOCAL_F2F_MANAGERS_KEY = 'aiou_local_f2f_managers';
+
+const F2F_CANDIDATES_COLLECTION = 'f2f_candidates';
+const LOCAL_F2F_CANDIDATES_KEY = 'aiou_local_f2f_candidates';
+
+const F2F_MANAGER_PAYMENTS_COLLECTION = 'f2f_manager_payments';
+const LOCAL_F2F_MANAGER_PAYMENTS_KEY = 'aiou_local_f2f_manager_payments';
+
+// 1. F2F Managers Helpers
+export function getLocalF2FManagers(): F2FManager[] {
+  try {
+    const data = localStorage.getItem(LOCAL_F2F_MANAGERS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(F2F_MANAGERS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local F2F managers:', error);
+    return [];
+  }
+}
+
+export function saveLocalF2FManagers(records: F2FManager[]) {
+  try {
+    const deletedIds = getDeletedIds(F2F_MANAGERS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_F2F_MANAGERS_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local F2F managers:', error);
+  }
+}
+
+export async function saveF2FManager(manager: F2FManager): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedManager = {
+    ...manager,
+    updatedAt: now,
+    createdAt: manager.createdAt || now
+  };
+
+  removeDeletedId(F2F_MANAGERS_COLLECTION, updatedManager.id);
+
+  const local = getLocalF2FManagers();
+  const index = local.findIndex(m => m.id === updatedManager.id);
+  if (index >= 0) {
+    local[index] = updatedManager;
+  } else {
+    local.push(updatedManager);
+  }
+  saveLocalF2FManagers(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, F2F_MANAGERS_COLLECTION, updatedManager.id);
+    await setDoc(docRef, updatedManager);
+    setQuotaExceeded(false);
+  } catch (error) {
+    console.warn('Firestore write failed for F2F Manager, using local fallback:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncF2FManagers(): Promise<F2FManager[]> {
+  const deletedIds = getDeletedIds(F2F_MANAGERS_COLLECTION);
+  let remoteRecords: F2FManager[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, F2F_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false);
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as F2FManager;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for F2F Managers. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalF2FManagers();
+  }
+
+  const local = getLocalF2FManagers();
+  const mergedMap = new Map<string, F2FManager>();
+  local.forEach(m => mergedMap.set(m.id, m));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalF2FManagers(merged);
+  return merged;
+}
+
+export async function deleteF2FManager(id: string): Promise<void> {
+  addDeletedId(F2F_MANAGERS_COLLECTION, id);
+
+  const local = getLocalF2FManagers();
+  const updated = local.filter(m => m.id !== id);
+  saveLocalF2FManagers(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, F2F_MANAGERS_COLLECTION, id));
+    setQuotaExceeded(false);
+  } catch (error) {
+    console.error('Firestore delete failed for F2F Manager:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+// 2. F2F Candidates Helpers
+export function getLocalF2FCandidates(): F2FCandidateRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_F2F_CANDIDATES_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(F2F_CANDIDATES_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local F2F candidates:', error);
+    return [];
+  }
+}
+
+export function saveLocalF2FCandidates(records: F2FCandidateRecord[]) {
+  try {
+    const deletedIds = getDeletedIds(F2F_CANDIDATES_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_F2F_CANDIDATES_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local F2F candidates:', error);
+  }
+}
+
+export async function saveF2FCandidate(record: F2FCandidateRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  removeDeletedId(F2F_CANDIDATES_COLLECTION, updatedRecord.id);
+
+  const local = getLocalF2FCandidates();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalF2FCandidates(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, F2F_CANDIDATES_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false);
+  } catch (error) {
+    console.warn('Firestore write failed for F2F Candidate, using local fallback:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncF2FCandidates(): Promise<F2FCandidateRecord[]> {
+  const deletedIds = getDeletedIds(F2F_CANDIDATES_COLLECTION);
+  let remoteRecords: F2FCandidateRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, F2F_CANDIDATES_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false);
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as F2FCandidateRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for F2F Candidates. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalF2FCandidates();
+  }
+
+  const local = getLocalF2FCandidates();
+  const mergedMap = new Map<string, F2FCandidateRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalF2FCandidates(merged);
+  return merged;
+}
+
+export async function deleteF2FCandidate(id: string): Promise<void> {
+  addDeletedId(F2F_CANDIDATES_COLLECTION, id);
+
+  const local = getLocalF2FCandidates();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalF2FCandidates(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, F2F_CANDIDATES_COLLECTION, id));
+    setQuotaExceeded(false);
+  } catch (error) {
+    console.error('Firestore delete failed for F2F Candidate:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+// 3. F2F Manager Payments Helpers
+export function getLocalF2FManagerPaymentRecords(): F2FManagerPaymentRecord[] {
+  try {
+    const data = localStorage.getItem(LOCAL_F2F_MANAGER_PAYMENTS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    const deletedIds = getDeletedIds(F2F_MANAGER_PAYMENTS_COLLECTION);
+    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+  } catch (error) {
+    console.error('Failed to load local F2F manager payments:', error);
+    return [];
+  }
+}
+
+export function saveLocalF2FManagerPaymentRecords(records: F2FManagerPaymentRecord[]) {
+  try {
+    const deletedIds = getDeletedIds(F2F_MANAGER_PAYMENTS_COLLECTION);
+    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    localStorage.setItem(LOCAL_F2F_MANAGER_PAYMENTS_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to save local F2F manager payments:', error);
+  }
+}
+
+export async function saveF2FManagerPaymentRecord(record: F2FManagerPaymentRecord): Promise<void> {
+  const now = new Date().toISOString();
+  const updatedRecord = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now
+  };
+
+  removeDeletedId(F2F_MANAGER_PAYMENTS_COLLECTION, updatedRecord.id);
+
+  const local = getLocalF2FManagerPaymentRecords();
+  const index = local.findIndex(r => r.id === updatedRecord.id);
+  if (index >= 0) {
+    local[index] = updatedRecord;
+  } else {
+    local.push(updatedRecord);
+  }
+  saveLocalF2FManagerPaymentRecords(local);
+
+  try {
+    await ensureAuthenticated();
+    const docRef = doc(db, F2F_MANAGER_PAYMENTS_COLLECTION, updatedRecord.id);
+    await setDoc(docRef, updatedRecord);
+    setQuotaExceeded(false);
+  } catch (error) {
+    console.warn('Firestore write failed for F2F Manager Payment, using local fallback:', error);
+    setQuotaExceeded(true);
+  }
+}
+
+export async function fetchAndSyncF2FManagerPaymentRecords(): Promise<F2FManagerPaymentRecord[]> {
+  const deletedIds = getDeletedIds(F2F_MANAGER_PAYMENTS_COLLECTION);
+  let remoteRecords: F2FManagerPaymentRecord[] = [];
+  try {
+    await ensureAuthenticated();
+    const q = query(collection(db, F2F_MANAGER_PAYMENTS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    setQuotaExceeded(false);
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data) {
+        const record = data as F2FManagerPaymentRecord;
+        if (deletedIds.includes(record.id)) {
+          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+        } else {
+          remoteRecords.push(record);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Firestore load failed for F2F Manager Payments. Reading local records only.', error);
+    setQuotaExceeded(true);
+    return getLocalF2FManagerPaymentRecords();
+  }
+
+  const local = getLocalF2FManagerPaymentRecords();
+  const mergedMap = new Map<string, F2FManagerPaymentRecord>();
+  local.forEach(r => mergedMap.set(r.id, r));
+  remoteRecords.forEach(remote => {
+    const l = mergedMap.get(remote.id);
+    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
+    if (!l || rTime >= lTime) {
+      mergedMap.set(remote.id, remote);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocalF2FManagerPaymentRecords(merged);
+  return merged;
+}
+
+export async function deleteF2FManagerPaymentRecord(id: string): Promise<void> {
+  addDeletedId(F2F_MANAGER_PAYMENTS_COLLECTION, id);
+
+  const local = getLocalF2FManagerPaymentRecords();
+  const updated = local.filter(r => r.id !== id);
+  saveLocalF2FManagerPaymentRecords(updated);
+
+  try {
+    await ensureAuthenticated();
+    await deleteDoc(doc(db, F2F_MANAGER_PAYMENTS_COLLECTION, id));
+    setQuotaExceeded(false);
+  } catch (error) {
+    console.error('Firestore delete failed for F2F Manager Payment:', error);
     setQuotaExceeded(true);
   }
 }

@@ -149,6 +149,46 @@ service cloud.firestore {
         && data.updatedAt is string;
     }
 
+    function isValidF2FManager(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 256
+        && data.phone is string && data.phone.size() <= 32
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    function isValidF2FCandidateRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.managerId is string && data.managerId.size() <= 128
+        && (data.semester == 'Autumn' || data.semester == 'Spring')
+        && data.year is string && data.year.size() <= 16
+        && data.serialNo is int
+        && data.candidateName is string && data.candidateName.size() <= 256
+        && data.fatherName is string && data.fatherName.size() <= 256
+        && data.contactNumber is string && data.contactNumber.size() <= 32
+        && data.registrationId is string && data.registrationId.size() <= 128
+        && data.f2fCode is string && data.f2fCode.size() <= 128
+        && data.regionalCentre is string && data.regionalCentre.size() <= 128
+        && (data.paymentReceivable is int || data.paymentReceivable is float)
+        && (!('remarks' in data) || (data.remarks is string && data.remarks.size() <= 5000))
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    function isValidF2FManagerPaymentRecord(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.managerId is string && data.managerId.size() <= 128
+        && (data.semester == 'Autumn' || data.semester == 'Spring')
+        && data.year is string && data.year.size() <= 16
+        && data.codeRates is list
+        && (data.grandTotalPayable is int || data.grandTotalPayable is float)
+        && data.paymentsList is list
+        && (data.totalPaidAmount is int || data.totalPaidAmount is float)
+        && (data.remainingPayable is int || data.remainingPayable is float)
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
     // Rules for students_records collection
     match /students_records/{studentId} {
       // Public read operations are allowed with ID validation
@@ -268,6 +308,57 @@ service cloud.firestore {
         && incoming().id == existing().id
         && incoming().createdAt == existing().createdAt
         && isValidResearchProjectRecord(incoming());
+
+      allow delete: if isValidId(recordId);
+    }
+
+    // Rules for f2f_managers collection
+    match /f2f_managers/{managerId} {
+      allow get: if isValidId(managerId);
+      allow list: if true;
+
+      allow create: if isValidId(managerId)
+        && incoming().id == managerId
+        && isValidF2FManager(incoming());
+
+      allow update: if isValidId(managerId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidF2FManager(incoming());
+
+      allow delete: if isValidId(managerId);
+    }
+
+    // Rules for f2f_candidates collection
+    match /f2f_candidates/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidF2FCandidateRecord(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidF2FCandidateRecord(incoming());
+
+      allow delete: if isValidId(recordId);
+    }
+
+    // Rules for f2f_manager_payments collection
+    match /f2f_manager_payments/{recordId} {
+      allow get: if isValidId(recordId);
+      allow list: if true;
+
+      allow create: if isValidId(recordId)
+        && incoming().id == recordId
+        && isValidF2FManagerPaymentRecord(incoming());
+
+      allow update: if isValidId(recordId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && isValidF2FManagerPaymentRecord(incoming());
 
       allow delete: if isValidId(recordId);
     }

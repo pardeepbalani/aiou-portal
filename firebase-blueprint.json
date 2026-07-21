@@ -242,6 +242,66 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "managerId", "courseCode", "perPaperCharges", "createdAt", "updatedAt"]
+    },
+    "F2FManager": {
+      "title": "F2FManager",
+      "description": "Information about Face-to-Face managers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone", "createdAt", "updatedAt"]
+    },
+    "F2FCandidateRecord": {
+      "title": "F2FCandidateRecord",
+      "description": "Candidate registration records for Face-to-Face workshops",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "managerId": { "type": "string" },
+        "semester": { "type": "string", "enum": ["Spring", "Autumn"] },
+        "year": { "type": "string" },
+        "serialNo": { "type": "number" },
+        "candidateName": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "registrationId": { "type": "string" },
+        "f2fCode": { "type": "string" },
+        "regionalCentre": { "type": "string" },
+        "paymentReceivable": { "type": "number" },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": [
+        "id", "managerId", "semester", "year", "serialNo", "candidateName", "fatherName",
+        "contactNumber", "registrationId", "f2fCode", "regionalCentre", "paymentReceivable", "createdAt", "updatedAt"
+      ]
+    },
+    "F2FManagerPaymentRecord": {
+      "title": "F2FManagerPaymentRecord",
+      "description": "Payments ledgers and histories for Face-to-Face workshop managers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "managerId": { "type": "string" },
+        "semester": { "type": "string", "enum": ["Spring", "Autumn"] },
+        "year": { "type": "string" },
+        "codeRates": { "type": "array" },
+        "grandTotalPayable": { "type": "number" },
+        "paymentsList": { "type": "array" },
+        "totalPaidAmount": { "type": "number" },
+        "remainingPayable": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": [
+        "id", "managerId", "semester", "year", "codeRates", "grandTotalPayable", "paymentsList", "totalPaidAmount", "remainingPayable", "createdAt", "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -272,6 +332,18 @@
     "/exam_manager_payments/{recordId}": {
       "schema": "ExamManagerPaymentRecord",
       "description": "Collection storing per course paper charge details for exam managers"
+    },
+    "/f2f_managers/{managerId}": {
+      "schema": "F2FManager",
+      "description": "Collection storing details of Face-to-Face workshop managers"
+    },
+    "/f2f_candidates/{recordId}": {
+      "schema": "F2FCandidateRecord",
+      "description": "Collection storing candidate records for Face-to-Face workshops"
+    },
+    "/f2f_manager_payments/{recordId}": {
+      "schema": "F2FManagerPaymentRecord",
+      "description": "Collection storing payment histories and code payment rate structures for F2F managers"
     }
   }
 }

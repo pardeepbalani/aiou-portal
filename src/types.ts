@@ -257,5 +257,61 @@ export interface ResearchProjectRecord {
   updatedAt: string;
 }
 
+// F2F Workshop Management Models
+export interface F2FManager {
+  id: string;
+  name: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface F2FCandidateRecord {
+  id: string;
+  managerId: string;
+  semester: 'Spring' | 'Autumn';
+  year: string;
+  serialNo: number; // S. No.
+  candidateName: string;
+  fatherName: string;
+  contactNumber: string;
+  registrationId: string;
+  f2fCode: string;
+  regionalCentre: string;
+  paymentReceivable: number; // PKR
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface F2FCodePaymentRate {
+  id: string;
+  f2fCode: string;
+  perCodeRate: number;
+  totalCodes: number;
+  totalAmount: number; // calculated: perCodeRate * totalCodes
+}
+
+export interface F2FManagerPaymentHistory {
+  id: string;
+  date: string;
+  amount: number;
+  remarks?: string;
+}
+
+export interface F2FManagerPaymentRecord {
+  id: string;
+  managerId: string;
+  semester: 'Spring' | 'Autumn';
+  year: string;
+  codeRates: F2FCodePaymentRate[];
+  grandTotalPayable: number; // calculated
+  paymentsList: F2FManagerPaymentHistory[];
+  totalPaidAmount: number; // calculated
+  remainingPayable: number; // calculated
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 

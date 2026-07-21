@@ -11,6 +11,7 @@ import DegreeMgtModule from './components/DegreeMgtModule';
 import QuizMgtModule from './components/QuizMgtModule';
 import SemesterCourseCodesModule from './components/SemesterCourseCodesModule';
 import ResearchProjectModule from './components/ResearchProjectModule';
+import F2FWorkshopModule from './components/F2FWorkshopModule';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
 import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords, isQuotaExceeded } from './firebase';
@@ -27,7 +28,7 @@ export default function App() {
     return (localStorage.getItem('aiou_theme') as 'green' | 'blue') || 'green';
   });
 
-  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records' | 'quiz_records' | 'semester_courses' | 'research_records'>(() => {
+  const [currentView, setCurrentView] = useState<'dashboard' | 'admission' | 'enroll' | 'list' | 'details' | 'exam_records' | 'degree_records' | 'quiz_records' | 'semester_courses' | 'research_records' | 'f2f_workshop'>(() => {
     return isLoggedIn ? 'dashboard' : 'dashboard'; // Default to dashboard if logged in
   });
 
@@ -218,6 +219,10 @@ export default function App() {
       setCurrentView('dashboard');
     } else if (currentView === 'tutorship') {
       setCurrentView('dashboard');
+    } else if (currentView === 'research_records') {
+      setCurrentView('dashboard');
+    } else if (currentView === 'f2f_workshop') {
+      setCurrentView('dashboard');
     }
   };
 
@@ -343,6 +348,9 @@ export default function App() {
                 onSelectResearchRecords={() => {
                   setCurrentView('research_records');
                 }}
+                onSelectF2FWorkshop={() => {
+                  setCurrentView('f2f_workshop');
+                }}
                 theme={theme}
                 stats={statsSummary}
                 records={records}
@@ -442,6 +450,14 @@ export default function App() {
             {currentView === 'research_records' && (
               <ResearchProjectModule
                 onBackToDashboard={() => setCurrentView('dashboard')}
+                theme={theme}
+              />
+            )}
+
+            {currentView === 'f2f_workshop' && (
+              <F2FWorkshopModule
+                onBackToDashboard={() => setCurrentView('dashboard')}
+                studentRecords={records}
                 theme={theme}
               />
             )}
