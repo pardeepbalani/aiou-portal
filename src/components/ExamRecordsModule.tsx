@@ -103,6 +103,10 @@ export default function ExamRecordsModule({
   const [examCourseCodes, setExamCourseCodes] = useState<string[]>([]);
   const [examDatesList, setExamDatesList] = useState<CourseExamDate[]>([]);
   const [newCourseCodeInput, setNewCourseCodeInput] = useState('');
+  
+  // Prefill directory tracking states
+  const [selectedPrefillStudent, setSelectedPrefillStudent] = useState<StudentRecord | null>(null);
+  const [selectedEnrollmentSemester, setSelectedEnrollmentSemester] = useState<number | ''>('');
 
   // Payment Form fields
   const [totalFee, setTotalFee] = useState<number | ''>('');
@@ -374,6 +378,8 @@ export default function ExamRecordsModule({
     setSemesterSeason('Autumn');
     setSemesterYear('2026');
     setExamSemesterTerm('Autumn 2026');
+    setSelectedPrefillStudent(null);
+    setSelectedEnrollmentSemester('');
     
     // Pre-populate with currently selected course
     const initialCourse = selectedCourse ? [selectedCourse] : [];
@@ -419,6 +425,16 @@ export default function ExamRecordsModule({
     setExamFatherName(info.fatherName);
     setExamStudentId(info.studentId);
     setExamContactNumber(info.contactNumber);
+    
+    // Find the student in studentRecords to support semester course selection during edits as well
+    const matchedStudent = studentRecords.find(s => s.registrationId === info.studentId || s.id === info.studentId);
+    if (matchedStudent) {
+      setSelectedPrefillStudent(matchedStudent);
+      setSelectedEnrollmentSemester(matchedStudent.semesters?.[0]?.semesterNumber || '');
+    } else {
+      setSelectedPrefillStudent(null);
+      setSelectedEnrollmentSemester('');
+    }
     
     // Normalize semesters list
     let sems = info.semesters || [];
@@ -851,17 +867,24 @@ export default function ExamRecordsModule({
   // Handle prefilling student details from existing Directory Records
   const handlePrefillSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const studentId = e.target.value;
-    if (!studentId) return;
+    if (!studentId) {
+      setSelectedPrefillStudent(null);
+      setSelectedEnrollmentSemester('');
+      return;
+    }
     const student = studentRecords.find(s => s.id === studentId);
     if (student) {
+      setSelectedPrefillStudent(student);
       setExamStudentName(student.studentName);
       setExamFatherName(student.fatherName);
       setExamStudentId(student.registrationId || student.id);
       setExamContactNumber(student.phoneNumber);
       
-      // Auto pre-populate courses from their active semester if available
+      // Auto pre-populate courses from their first semester if available
       const firstSem = student.semesters?.[0];
       const codes = firstSem?.courses?.map(c => c.code).filter(Boolean) || [];
+      setSelectedEnrollmentSemester(firstSem ? firstSem.semesterNumber : '');
+      
       const initialSemId = `sem-${Math.random().toString(36).substr(2, 9)}`;
       const semTermStr = student.semesterType && student.admissionYear ? `${student.semesterType} ${student.admissionYear}` : 'Autumn 2026';
       
@@ -898,6 +921,51 @@ export default function ExamRecordsModule({
       setNewPayAmount('');
 
       triggerToast(`Prefilled details for ${student.studentName}!`);
+    }
+  };
+
+  // Handle semester-wise course retrieval and auto-loading
+  const handleEnrollmentSemesterChange = (semNum: number) => {
+    setSelectedEnrollmentSemester(semNum);
+    if (!selectedPrefillStudent) return;
+    
+    // Find matching semester data
+    const semData = selectedPrefillStudent.semesters?.find(s => s.semesterNumber === semNum);
+    if (semData) {
+      const codes = semData.courses?.map(c => c.code).filter(Boolean) || [];
+      
+      // Load all codes into active state
+      setExamCourseCodes(codes);
+      
+      const newDates = codes.map(code => {
+        const existing = examDatesList.find(d => d.courseCode === code);
+        return existing || {
+          courseCode: code,
+          examDate: '',
+          status: 'Pending',
+          reappearDate: '',
+          remarks: ''
+        };
+      });
+      setExamDatesList(newDates);
+
+      // Sync to the active form semester tab
+      if (activeFormSemId) {
+        setFormSemesters(prev => prev.map(sem => {
+          if (sem.id === activeFormSemId) {
+            return {
+              ...sem,
+              courseCodes: codes,
+              examDates: newDates
+            };
+          }
+          return sem;
+        }));
+      }
+
+      triggerToast(`Loaded ${codes.length} courses from Semester ${semNum}!`);
+    } else {
+      triggerToast(`No previously enrolled record found for Semester ${semNum}.`);
     }
   };
 
@@ -1712,6 +1780,136 @@ export default function ExamRecordsModule({
                       </div>
                     )}
                   </div>
+
+                  {/* Section 2b: Semester-wise Course Selection (From Directory) */}
+                  {selectedPrefillStudent && (
+                    <div className="bg-purple-50/40 border border-purple-150 p-5 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-100/50 pb-3">
+                        <div>
+                          <h6 className="text-xs font-extrabold text-purple-950 uppercase tracking-wide">
+                            Semester-wise Course Selection (From Previously Enrolled Directory)
+                          </h6>
+                          <p className="text-[10px] text-gray-550">
+                            Click any semester below to automatically load its enrolled courses. Only valid, previously enrolled courses will be available.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-purple-800 bg-purple-100/65 px-2.5 py-1 rounded-md uppercase font-mono">
+                            Linked: {selectedPrefillStudent.studentName}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Semester Selectors */}
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedPrefillStudent.semesters || []).map((sem) => {
+                          const isCurrentSelected = selectedEnrollmentSemester === sem.semesterNumber;
+                          return (
+                            <button
+                              key={sem.semesterNumber}
+                              type="button"
+                              onClick={() => handleEnrollmentSemesterChange(sem.semesterNumber)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                                isCurrentSelected
+                                  ? isGreen
+                                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs'
+                                    : 'bg-sky-600 border-sky-600 text-white shadow-3xs'
+                                  : 'bg-white border-gray-200 text-gray-755 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span>Semester {sem.semesterNumber}</span>
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
+                                isCurrentSelected 
+                                  ? 'bg-white/20 text-white' 
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {sem.courses?.length || 0} Courses
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Selectable courses inside selected semester */}
+                      {selectedEnrollmentSemester && (
+                        <div className="space-y-2.5 pt-1.5">
+                          <span className="block text-[10px] text-gray-550 font-extrabold uppercase tracking-wide">
+                            Select / Deselect Course Codes for this Examination:
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                            {(() => {
+                              const semData = selectedPrefillStudent.semesters?.find(s => s.semesterNumber === selectedEnrollmentSemester);
+                              const courses = semData?.courses || [];
+                              if (courses.length === 0) {
+                                return (
+                                  <p className="text-xs text-gray-450 italic col-span-full">
+                                    No course codes found in Semester {selectedEnrollmentSemester} of previous records.
+                                  </p>
+                                );
+                              }
+                              return courses.map(course => {
+                                const isChecked = examCourseCodes.includes(course.code);
+                                return (
+                                  <button
+                                    key={course.code}
+                                    type="button"
+                                    onClick={() => {
+                                      if (isChecked) {
+                                        handleRemoveCourseCodeFromExam(course.code);
+                                      } else {
+                                        const updatedCodes = [...examCourseCodes, course.code];
+                                        setExamCourseCodes(updatedCodes);
+                                        const newDates = [...examDatesList];
+                                        if (!newDates.some(d => d.courseCode === course.code)) {
+                                          newDates.push({
+                                            courseCode: course.code,
+                                            examDate: '',
+                                            status: 'Pending',
+                                            reappearDate: '',
+                                            remarks: ''
+                                          });
+                                        }
+                                        setExamDatesList(newDates);
+                                        if (activeFormSemId) {
+                                          setFormSemesters(prev => prev.map(sem => {
+                                            if (sem.id === activeFormSemId) {
+                                              return {
+                                                ...sem,
+                                                courseCodes: updatedCodes,
+                                                examDates: newDates
+                                              };
+                                            }
+                                            return sem;
+                                          }));
+                                        }
+                                      }
+                                    }}
+                                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between gap-2.5 cursor-pointer text-left ${
+                                      isChecked
+                                        ? isGreen
+                                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                                          : 'bg-sky-50 border-sky-300 text-sky-950'
+                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <span className="font-mono">{course.code}</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {}} // handled by button onClick
+                                      className={`rounded pointer-events-none w-3.5 h-3.5 ${
+                                        isGreen ? 'text-emerald-600 focus:ring-emerald-500' : 'text-sky-600 focus:ring-sky-500'
+                                      }`}
+                                    />
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* Course Code adder list */}
