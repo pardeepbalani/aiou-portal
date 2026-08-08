@@ -13,6 +13,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord, ExamManagerPaymentRecord, F2FManager, F2FCandidateRecord, F2FManagerPaymentRecord } from './types';
+import { getSampleDegreeRecords } from './samples';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -705,12 +706,59 @@ export async function deleteStudentExamInfo(id: string): Promise<void> {
 const DEGREE_RECORDS_COLLECTION = 'degree_records';
 const LOCAL_DEGREE_RECORDS_KEY = 'aiou_local_degree_records';
 
+export function cleanObjectForFirestore(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  Object.keys(obj).forEach(key => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+}
+
+export function sanitizeStudentDegreeRecord(r: any): StudentDegreeRecord {
+  const sanitized: StudentDegreeRecord = {
+    id: typeof r?.id === 'string' && r.id ? r.id : `deg-${Math.random().toString(36).substring(2, 9)}`,
+    studentName: typeof r?.studentName === 'string' ? r.studentName : '',
+    fatherName: typeof r?.fatherName === 'string' ? r.fatherName : '',
+    studentId: typeof r?.studentId === 'string' ? r.studentId : '',
+    contactNumber: typeof r?.contactNumber === 'string' ? r.contactNumber : '',
+    courseName: typeof r?.courseName === 'string' ? r.courseName : '',
+    category: r?.category === 'Urgent' ? 'Urgent' : 'Normal',
+    appliedDate: typeof r?.appliedDate === 'string' ? r.appliedDate : new Date().toISOString().split('T')[0],
+    status: ['Applied', 'Under Process', 'Dispatched', 'Received at Hub', 'Delivered to Student'].includes(r?.status) ? r.status : 'Applied',
+    totalFee: typeof r?.totalFee === 'number' ? r.totalFee : Number(r?.totalFee) || 0,
+    amountReceived: typeof r?.amountReceived === 'number' ? r.amountReceived : Number(r?.amountReceived) || 0,
+    paymentHistory: Array.isArray(r?.paymentHistory) ? r.paymentHistory.map((p: any) => ({
+      id: typeof p?.id === 'string' ? p.id : `pay-${Math.random().toString(36).substring(2, 9)}`,
+      date: typeof p?.date === 'string' ? p.date : new Date().toISOString().split('T')[0],
+      amount: typeof p?.amount === 'number' ? p.amount : Number(p?.amount) || 0,
+      remarks: typeof p?.remarks === 'string' ? p.remarks : ''
+    })) : [],
+    verificationStatus: ['Pending', 'Verified', 'Rejected'].includes(r?.verificationStatus) ? r.verificationStatus : 'Pending',
+    createdAt: typeof r?.createdAt === 'string' ? r.createdAt : new Date().toISOString(),
+    updatedAt: typeof r?.updatedAt === 'string' ? r.updatedAt : new Date().toISOString()
+  };
+
+  if (typeof r?.degreeReceivedDate === 'string' && r.degreeReceivedDate.trim()) {
+    sanitized.degreeReceivedDate = r.degreeReceivedDate.trim();
+  }
+  if (typeof r?.trackingNumber === 'string' && r.trackingNumber.trim()) {
+    sanitized.trackingNumber = r.trackingNumber.trim();
+  }
+  if (typeof r?.remarks === 'string' && r.remarks.trim()) {
+    sanitized.remarks = r.remarks.trim();
+  }
+
+  return sanitized;
+}
+
 export function getLocalDegreeRecords(): StudentDegreeRecord[] {
   try {
     const data = localStorage.getItem(LOCAL_DEGREE_RECORDS_KEY);
     const parsed = data ? JSON.parse(data) : [];
     const deletedIds = getDeletedIds(DEGREE_RECORDS_COLLECTION);
-    return parsed.filter((r: any) => !deletedIds.includes(r.id));
+    return parsed.filter((r: any) => !deletedIds.includes(r.id)).map(sanitizeStudentDegreeRecord);
   } catch (error) {
     console.error('Failed to load local degree records:', error);
     return [];
@@ -720,7 +768,7 @@ export function getLocalDegreeRecords(): StudentDegreeRecord[] {
 export function saveLocalDegreeRecords(records: StudentDegreeRecord[]): void {
   try {
     const deletedIds = getDeletedIds(DEGREE_RECORDS_COLLECTION);
-    const filtered = records.filter(r => !deletedIds.includes(r.id));
+    const filtered = records.map(sanitizeStudentDegreeRecord).filter(r => !deletedIds.includes(r.id));
     localStorage.setItem(LOCAL_DEGREE_RECORDS_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.error('Failed to save local degree records:', error);
@@ -729,28 +777,29 @@ export function saveLocalDegreeRecords(records: StudentDegreeRecord[]): void {
 
 export async function saveStudentDegreeRecord(record: StudentDegreeRecord): Promise<void> {
   const now = new Date().toISOString();
-  const updatedRecord = {
+  const sanitized = sanitizeStudentDegreeRecord({
     ...record,
     updatedAt: now,
     createdAt: record.createdAt || now
-  };
+  });
 
   // Remove from deleted tracking if present
-  removeDeletedId(DEGREE_RECORDS_COLLECTION, updatedRecord.id);
+  removeDeletedId(DEGREE_RECORDS_COLLECTION, sanitized.id);
 
   const local = getLocalDegreeRecords();
-  const index = local.findIndex(r => r.id === updatedRecord.id);
+  const index = local.findIndex(r => r.id === sanitized.id);
   if (index >= 0) {
-    local[index] = updatedRecord;
+    local[index] = sanitized;
   } else {
-    local.push(updatedRecord);
+    local.push(sanitized);
   }
   saveLocalDegreeRecords(local);
 
   try {
     await ensureAuthenticated();
-    const docRef = doc(db, DEGREE_RECORDS_COLLECTION, updatedRecord.id);
-    await setDoc(docRef, updatedRecord);
+    const docRef = doc(db, DEGREE_RECORDS_COLLECTION, sanitized.id);
+    const cleanData = cleanObjectForFirestore(sanitized);
+    await setDoc(docRef, cleanData);
     setQuotaExceeded(false); // Self-healing
   } catch (error) {
     console.warn('Firestore write failed for Student Degree Record, using local fallback. Error:', error);
@@ -763,15 +812,22 @@ export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeR
   let remoteRecords: StudentDegreeRecord[] = [];
   try {
     await ensureAuthenticated();
-    const q = query(collection(db, DEGREE_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      const q = query(collection(db, DEGREE_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+      querySnapshot = await getDocs(q);
+    } catch (e) {
+      console.warn('Fallback degree_records query without orderBy:', e);
+      querySnapshot = await getDocs(collection(db, DEGREE_RECORDS_COLLECTION));
+    }
+
     setQuotaExceeded(false); // Self-healing
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       if (data) {
-        const record = data as StudentDegreeRecord;
+        const record = sanitizeStudentDegreeRecord(data);
         if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
+          deleteDoc(docSnap.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
         } else {
           remoteRecords.push(record);
         }
@@ -780,7 +836,6 @@ export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeR
   } catch (error) {
     console.error('Firestore load failed for Student Degree Records. Reading local records only.', error);
     setQuotaExceeded(true);
-    return getLocalDegreeRecords();
   }
 
   const local = getLocalDegreeRecords();
@@ -795,8 +850,41 @@ export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeR
     }
   });
 
-  const merged = Array.from(mergedMap.values());
+  let merged = Array.from(mergedMap.values());
+
+  // Seed sample degree records if database & local storage are both empty
+  if (merged.length === 0 && localStorage.getItem('aiou_degree_seeded') !== 'true') {
+    const samples = getSampleDegreeRecords();
+    localStorage.setItem('aiou_degree_seeded', 'true');
+    saveLocalDegreeRecords(samples);
+    for (const sample of samples) {
+      try {
+        await saveStudentDegreeRecord(sample);
+      } catch (e) {
+        console.warn('Could not write sample degree record to Firestore', e);
+      }
+    }
+    return samples;
+  }
+
   saveLocalDegreeRecords(merged);
+
+  // Sync local records back to Firestore if missing or newer
+  for (const record of merged) {
+    const remoteRecord = remoteRecords.find(r => r.id === record.id);
+    const recordTime = record.updatedAt ? new Date(record.updatedAt).getTime() : 0;
+    const remoteTime = (remoteRecord && remoteRecord.updatedAt) ? new Date(remoteRecord.updatedAt).getTime() : 0;
+
+    if (!remoteRecord || recordTime > remoteTime) {
+      try {
+        const cleanData = cleanObjectForFirestore(record);
+        await setDoc(doc(db, DEGREE_RECORDS_COLLECTION, record.id), cleanData);
+      } catch (e) {
+        console.warn('Sync back degree record to Firestore failed:', record.id, e);
+      }
+    }
+  }
+
   return merged;
 }
 

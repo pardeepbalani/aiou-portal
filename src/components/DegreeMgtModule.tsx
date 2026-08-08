@@ -200,7 +200,7 @@ export default function DegreeMgtModule({
       courseName: customCourse || 'BS Computer Science',
       category,
       appliedDate,
-      degreeReceivedDate: degreeReceivedDate || undefined,
+      ...(degreeReceivedDate.trim() ? { degreeReceivedDate: degreeReceivedDate.trim() } : {}),
       status,
       totalFee,
       amountReceived: editingRecord ? editingRecord.amountReceived : amountReceived,
@@ -210,9 +210,9 @@ export default function DegreeMgtModule({
         amount: amountReceived,
         remarks: 'Initial deposit'
       }] : []),
-      trackingNumber: trackingNumber || undefined,
+      ...(trackingNumber.trim() ? { trackingNumber: trackingNumber.trim() } : {}),
       verificationStatus,
-      remarks: remarks || undefined,
+      ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
       createdAt: editingRecord ? editingRecord.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -221,7 +221,7 @@ export default function DegreeMgtModule({
       await saveStudentDegreeRecord(record);
       triggerToast(editingRecord ? 'Degree application updated successfully!' : 'Degree application submitted successfully!');
       setIsFormOpen(false);
-      loadDegreeRecords();
+      await loadDegreeRecords();
     } catch (err) {
       console.error(err);
       triggerToast('Error saving degree record.');

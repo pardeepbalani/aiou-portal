@@ -1,4 +1,71 @@
-import { StudentRecord } from './types';
+import { StudentRecord, StudentDegreeRecord } from './types';
+
+export function getSampleDegreeRecords(): StudentDegreeRecord[] {
+  return [
+    {
+      id: 'deg-sample-1',
+      studentName: 'Ahmad Khan',
+      fatherName: 'Muhammad Khan',
+      studentId: '23FPA09511',
+      contactNumber: '03001234567',
+      courseName: 'B.Ed (1.5 Years)',
+      category: 'Urgent',
+      appliedDate: '2026-01-10',
+      degreeReceivedDate: '2026-02-15',
+      status: 'Received at Hub',
+      totalFee: 4000,
+      amountReceived: 4000,
+      paymentHistory: [
+        { id: 'pay-deg-1', date: '2026-01-10', amount: 4000, remarks: 'Full fee paid at time of application' }
+      ],
+      trackingNumber: 'TCS-98421033',
+      verificationStatus: 'Verified',
+      remarks: 'All documents verified. Degree received at Regional Hub.',
+      createdAt: '2026-01-10T10:00:00.000Z',
+      updatedAt: '2026-02-15T14:30:00.000Z'
+    },
+    {
+      id: 'deg-sample-2',
+      studentName: 'Sana Fatima',
+      fatherName: 'Abdul Rehman',
+      studentId: '24SPA08412',
+      contactNumber: '03159876543',
+      courseName: 'B.A Admission',
+      category: 'Normal',
+      appliedDate: '2026-02-01',
+      status: 'Under Process',
+      totalFee: 2000,
+      amountReceived: 2000,
+      paymentHistory: [
+        { id: 'pay-deg-2', date: '2026-02-01', amount: 2000, remarks: 'Normal apply deposit' }
+      ],
+      verificationStatus: 'Verified',
+      remarks: 'Degree processing at main campus Islamabad.',
+      createdAt: '2026-02-01T11:20:00.000Z',
+      updatedAt: '2026-02-01T11:20:00.000Z'
+    },
+    {
+      id: 'deg-sample-3',
+      studentName: 'Muhammad Ali',
+      fatherName: 'Tariq Mehmood',
+      studentId: '22FPA01944',
+      contactNumber: '03451122334',
+      courseName: 'BS Computer Science',
+      category: 'Urgent',
+      appliedDate: '2026-02-20',
+      status: 'Applied',
+      totalFee: 4000,
+      amountReceived: 2000,
+      paymentHistory: [
+        { id: 'pay-deg-3', date: '2026-02-20', amount: 2000, remarks: 'Partial deposit' }
+      ],
+      verificationStatus: 'Pending',
+      remarks: 'Awaiting remaining fee payment and metric transcript copy.',
+      createdAt: '2026-02-20T09:15:00.000Z',
+      updatedAt: '2026-02-20T09:15:00.000Z'
+    }
+  ];
+}
 
 export function getSampleRecords(): StudentRecord[] {
   return [
