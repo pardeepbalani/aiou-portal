@@ -104,38 +104,46 @@ export default function App() {
     }
   };
 
-  // Load records and seed if empty
+  // Load records and seed if empty or incomplete
   const loadData = async () => {
     setLoading(true);
     setSyncStatus('syncing');
     try {
       // 1. Try to fetch from Firebase and sync
       const synced = await fetchAndSyncRecords();
-      
-      // 2. If no records exist, seed some beautiful sample records for a complete demo experience!
-      const hasSeeded = localStorage.getItem('aiou_seeded') === 'true';
-      if (synced.length === 0 && !hasSeeded) {
-        const sampleRecords = getSampleRecords();
+      const allSamples = getSampleRecords(); // 95 complete records
+      const hasFullSeeded = localStorage.getItem('aiou_95_seeded_v2') === 'true';
+
+      let combined = [...synced];
+      // If records are fewer than 95 or full seed flag isn't set, merge with full 95 dataset
+      if (combined.length < 95 || !hasFullSeeded) {
+        const recordMap = new Map<string, StudentRecord>();
+        allSamples.forEach(r => recordMap.set(r.id, r));
+        synced.forEach(r => recordMap.set(r.id, r)); // synced overrides or adds
+        combined = Array.from(recordMap.values());
+        
+        localStorage.setItem('aiou_95_seeded_v2', 'true');
         localStorage.setItem('aiou_seeded', 'true');
         
-        // Save samples to Local Storage and Firestore
-        saveLocalRecords(sampleRecords);
-        for (const sample of sampleRecords) {
-          try {
-            await saveStudentRecord(sample);
-          } catch (e) {
-            console.warn('Could not write initial sample to Firebase', e);
+        // Save merged 95 back to local storage
+        saveLocalRecords(combined);
+        
+        // Push any missing sample records to Firestore in background
+        for (const sample of combined) {
+          if (!synced.some(s => s.id === sample.id)) {
+            saveStudentRecord(sample).catch(() => {});
           }
         }
-        setRecords(sampleRecords);
-      } else if (synced.length === 0) {
-        // If the database was cleared or we already seeded, respect the user's intent of an empty database!
-        setRecords([]);
-      } else {
-        // If we have records, ensure seeded is marked as true to prevent future accidental reseeding
-        localStorage.setItem('aiou_seeded', 'true');
-        setRecords(synced);
       }
+
+      // Sort by updatedAt descending
+      combined.sort((a, b) => {
+        const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return tB - tA;
+      });
+
+      setRecords(combined);
       setSyncStatus('synced');
     } catch (error) {
       console.error('Failed to load database records:', error);
@@ -143,19 +151,28 @@ export default function App() {
       
       // Fallback: Read local storage records
       const local = getLocalRecords();
-      const hasSeeded = localStorage.getItem('aiou_seeded') === 'true';
-      if (local.length === 0 && !hasSeeded) {
-        console.log('No local records found on this browser. Seeding sample demo records locally.');
-        const sampleRecords = getSampleRecords();
+      const allSamples = getSampleRecords(); // 95 complete records
+      const hasFullSeeded = localStorage.getItem('aiou_95_seeded_v2') === 'true';
+
+      let combined = [...local];
+      if (combined.length < 95 || !hasFullSeeded) {
+        const recordMap = new Map<string, StudentRecord>();
+        allSamples.forEach(r => recordMap.set(r.id, r));
+        local.forEach(r => recordMap.set(r.id, r));
+        combined = Array.from(recordMap.values());
+
+        localStorage.setItem('aiou_95_seeded_v2', 'true');
         localStorage.setItem('aiou_seeded', 'true');
-        saveLocalRecords(sampleRecords);
-        setRecords(sampleRecords);
-      } else if (local.length === 0) {
-        setRecords([]);
-      } else {
-        localStorage.setItem('aiou_seeded', 'true');
-        setRecords(local);
+        saveLocalRecords(combined);
       }
+
+      combined.sort((a, b) => {
+        const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return tB - tA;
+      });
+
+      setRecords(combined);
     } finally {
       setLoading(false);
     }

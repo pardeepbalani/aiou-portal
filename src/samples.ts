@@ -68,142 +68,130 @@ export function getSampleDegreeRecords(): StudentDegreeRecord[] {
 }
 
 export function getSampleRecords(): StudentRecord[] {
-  return [
-    {
-      id: '23FPA09511',
-      studentName: 'Ahmad Khan',
-      fatherName: 'Muhammad Khan',
-      phoneNumber: '03001234567',
-      registrationId: '23FPA09511',
-      lmsPasswordId: 'ahmad@aiou',
-      cmsPasswordId: 'aiou8601',
-      admissionYear: '2025',
-      programSelected: 'B.Ed (1.5 Years)',
-      semesterType: 'Autumn',
-      semesters: [
-        {
-          semesterNumber: 1,
-          courses: [
-            { code: '8601', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '8602', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '8603', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '8604', assignment: false, workshop: true, quiz: false, assignment1: true, assignment2: false },
-            { code: '8605', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '8606', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false }
-          ]
-        },
-        {
-          semesterNumber: 2,
-          courses: [
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false }
-          ]
-        },
-        {
-          semesterNumber: 3,
-          courses: [
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false }
-          ]
-        }
-      ],
-      totalReceivable: 24500,
-      paymentsList: [
-        { id: 'pay-1', date: '2025-10-15', amount: 15000 },
-        { id: 'pay-2', date: '2026-02-10', amount: 5000 }
-      ],
-      serviceChargesAmount: 1200,
-      remarks: 'Requires physical workshop guides for semester 2',
-      serviceEnrollment: true,
-      serviceWorkshops: true,
-      serviceQuiz: true,
-      serviceAssignments: false,
-      servicePhysicalWorkshop: true,
-      serviceResearchReport: false,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: '24SPA08412',
-      studentName: 'Sana Fatima',
-      fatherName: 'Abdul Rehman',
-      phoneNumber: '03159876543',
-      registrationId: '24SPA08412',
-      lmsPasswordId: 'sana@9911',
-      cmsPasswordId: 'cms#sana',
-      admissionYear: '2026',
-      programSelected: 'B.A Admission',
-      semesterType: 'Spring',
-      semesters: [
-        {
-          semesterNumber: 1,
-          courses: [
-            { code: '401', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '402', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '403', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '404', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '405', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true },
-            { code: '406', assignment: true, workshop: true, quiz: true, assignment1: true, assignment2: true }
-          ]
-        },
-        {
-          semesterNumber: 2,
-          courses: [
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false }
-          ]
-        },
-        {
-          semesterNumber: 3,
-          courses: [
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false }
-          ]
-        },
-        {
-          semesterNumber: 4,
-          courses: [
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false },
-            { code: '', assignment: false, workshop: false, quiz: false, assignment1: false, assignment2: false }
-          ]
-        }
-      ],
-      totalReceivable: 18000,
-      paymentsList: [
-        { id: 'pay-3', date: '2026-03-01', amount: 18000 }
-      ],
-      serviceChargesAmount: 800,
-      remarks: 'Full fees paid. Outstanding candidate.',
-      serviceEnrollment: true,
-      serviceWorkshops: false,
-      serviceQuiz: false,
-      serviceAssignments: false,
-      servicePhysicalWorkshop: false,
-      serviceResearchReport: false,
-      status: 'completed',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
+  const firstNames = [
+    'Ahmad', 'Sana', 'Muhammad', 'Zainab', 'Usama', 'Hamza', 'Aisha', 'Fatima', 'Syed', 'Bilal',
+    'Tariq', 'Noman', 'Maria', 'Hassan', 'Maryam', 'Ali', 'Omer', 'Khadija', 'Saad', 'Hira',
+    'Asad', 'Rabia', 'Farhan', 'Iqra', 'Waqas', 'Anum', 'Zeeshan', 'Saba', 'Shahzaib', 'Mehwish',
+    'Kamran', 'Sidra', 'Imran', 'Nida', 'Faisal', 'Laiba', 'Arslan', 'Areeba', 'Babar', 'Ayesha',
+    'Rizwan', 'Bushra', 'Danish', 'Sumaira', 'Naveed', 'Kiran', 'Adeel', 'Mahnoor', 'Shehroz', 'Farah',
+    'Haris', 'Kausar', 'Taimoor', 'Rimsha', 'Muneeb', 'Saima', 'Sufyan', 'Shazia', 'Shoaib', 'Sobia',
+    'Rehan', 'Fouzia', 'Yasir', 'Nazia', 'Junaid', 'Sania', 'Ahsan', 'Kinza', 'Zahid', 'Sundas',
+    'Shahid', 'Eman', 'Moazzam', 'Tehreem', 'Mudassir', 'Bishma', 'Fahad', 'Nimra', 'Atif', 'Alina',
+    'Rashid', 'Zara', 'Asif', 'Aiman', 'Tanveer', 'Habiba', 'Zia', 'Sadia', 'Sohail', 'Hina',
+    'Salman', 'Javeria', 'Shakir', 'Amna', 'Waseem'
   ];
+
+  const fatherNames = [
+    'Khan', 'Rehman', 'Mehmood', 'Shah', 'Malik', 'Zahra', 'Farhan', 'Ahmed', 'Raza', 'Qureshi',
+    'Nawaz', 'Imran', 'Iqbal', 'Hussain', 'Abbasi', 'Chaudhry', 'Bhatti', 'Jutt', 'Gharshin', 'Kakar',
+    'Tareen', 'Siddiqui', 'Baig', 'Mirza', 'Ansari', 'Ghafoor', 'Saeed', 'Aziz', 'Sharif', 'Rashid',
+    'Akram', 'Arshad', 'Latif', 'Yaseen', 'Mustafa', 'Ghanis', 'Khawaja', 'Vohra', 'Laghari', 'Soomro'
+  ];
+
+  const programs = [
+    'B.Ed (1.5 Years)', 'B.A Admission', 'BS Computer Science', 'M.A Education',
+    'B.Com', 'BS English', 'BBA', 'M.Sc Mathematics', 'BS Physics', 'B.Ed (2.5 Years)',
+    'Associate Degree in Arts', 'Associate Degree in Commerce'
+  ];
+
+  const getCourseCodes = (program: string, semNum: number) => {
+    let base = 1000 * (semNum);
+    if (program.includes('B.Ed')) base = 8600 + (semNum - 1) * 10;
+    else if (program.includes('B.A')) base = 400 + (semNum - 1) * 10;
+    else if (program.includes('Computer')) base = 3400 + (semNum - 1) * 10;
+    else if (program.includes('M.A')) base = 6500 + (semNum - 1) * 10;
+    else if (program.includes('B.Com')) base = 1420 + (semNum - 1) * 10;
+    else if (program.includes('English')) base = 9000 + (semNum - 1) * 10;
+    else if (program.includes('BBA')) base = 5400 + (semNum - 1) * 10;
+    else if (program.includes('Mathematics')) base = 7500 + (semNum - 1) * 10;
+
+    return [1, 2, 3, 4, 5, 6].map(i => (base + i).toString());
+  };
+
+  const records: StudentRecord[] = [];
+
+  for (let i = 1; i <= 95; i++) {
+    const sIndex = i - 1;
+    const fName = firstNames[sIndex % firstNames.length];
+    const faName = fatherNames[sIndex % fatherNames.length];
+    const studentName = `${fName} ${faName}`;
+    const fatherName = `${fatherNames[(sIndex + 5) % fatherNames.length]} ${faName}`;
+
+    // Format registration ID as 23FPA095xx or 24SPA084xx
+    const regNumStr = i.toString().padStart(2, '0');
+    const registrationId = i % 2 === 1 ? `23FPA095${regNumStr}` : `24SPA084${regNumStr}`;
+    const phoneNum = `0300${(1234500 + i).toString()}`;
+    const program = programs[sIndex % programs.length];
+    const year = i % 3 === 0 ? '2024' : (i % 3 === 1 ? '2025' : '2026');
+    const semesterType = i % 2 === 0 ? 'Spring' : 'Autumn';
+    const status: 'active' | 'completed' | 'suspended' = i % 15 === 0 ? 'suspended' : (i % 4 === 0 ? 'completed' : 'active');
+
+    const semesters = [1, 2, 3].map(semNum => {
+      const codes = getCourseCodes(program, semNum);
+      const isCompletedSem = semNum === 1 || (semNum === 2 && i % 2 === 0);
+      return {
+        semesterNumber: semNum,
+        courses: codes.map((code, cIdx) => ({
+          code: isCompletedSem ? code : (cIdx < 3 ? code : ''),
+          assignment: isCompletedSem || cIdx < 3,
+          workshop: isCompletedSem || cIdx < 2,
+          quiz: isCompletedSem || cIdx < 2,
+          assignment1: isCompletedSem || cIdx < 4,
+          assignment2: isCompletedSem || cIdx < 2,
+        })),
+        semesterFee: 12000 + (semNum * 1500),
+        semesterPaidAmount: isCompletedSem ? 12000 + (semNum * 1500) : 6000,
+        remarks: `Semester ${semNum} ${isCompletedSem ? 'cleared successfully' : 'in progress'}`
+      };
+    });
+
+    const totalFee = 24000 + (i % 10) * 1500;
+    const paidAmount = status === 'completed' ? totalFee : Math.floor(totalFee * (0.5 + (i % 5) * 0.1));
+
+    // Created & Updated timestamps spread across late 2025 to early 2026
+    const dateObj = new Date(2026, (i % 3), (i % 28) + 1, 10, (i * 3) % 60);
+    const timeStr = dateObj.toISOString();
+
+    records.push({
+      id: registrationId,
+      studentName,
+      fatherName,
+      phoneNumber: phoneNum,
+      registrationId,
+      lmsPasswordId: `${fName.toLowerCase()}@aiou${(10 + i)}`,
+      cmsPasswordId: `cms#${registrationId.toLowerCase()}`,
+      admissionYear: year,
+      programSelected: program,
+      semesterType,
+      semesters,
+      totalReceivable: totalFee,
+      paymentsList: [
+        {
+          id: `pay-${i}-1`,
+          date: `2025-${((i % 5) + 8).toString().padStart(2, '0')}-15`,
+          amount: Math.floor(paidAmount * 0.6),
+          voucherRef: `VOUCH-${1000 + i}`
+        },
+        ...(paidAmount > Math.floor(paidAmount * 0.6) ? [{
+          id: `pay-${i}-2`,
+          date: `2026-01-20`,
+          amount: paidAmount - Math.floor(paidAmount * 0.6),
+          voucherRef: `VOUCH-${2000 + i}`
+        }] : [])
+      ],
+      serviceChargesAmount: 1000 + (i % 5) * 200,
+      remarks: `AIOU Student record #${i}. Contact verified.`,
+      serviceEnrollment: true,
+      serviceWorkshops: i % 2 === 0,
+      serviceQuiz: i % 3 !== 0,
+      serviceAssignments: true,
+      servicePhysicalWorkshop: i % 4 === 0,
+      serviceResearchReport: i % 5 === 0,
+      status,
+      createdAt: timeStr,
+      updatedAt: timeStr
+    });
+  }
+
+  return records;
 }
