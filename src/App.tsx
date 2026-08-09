@@ -104,75 +104,60 @@ export default function App() {
     }
   };
 
-  // Load records and seed if empty or incomplete
+  // Load records and ensure only genuine user records are shown
   const loadData = async () => {
     setLoading(true);
     setSyncStatus('syncing');
     try {
-      // 1. Try to fetch from Firebase and sync
+      // 1. Fetch from Firebase and sync
       const synced = await fetchAndSyncRecords();
-      const allSamples = getSampleRecords(); // 95 complete records
-      const hasFullSeeded = localStorage.getItem('aiou_95_seeded_v2') === 'true';
+      
+      // Filter out auto-seeded synthetic mock students (identified by remark pattern 'AIOU Student record #')
+      // keeping only genuine user filled records
+      let realRecords = synced.filter(r => !r.remarks?.includes('AIOU Student record #'));
 
-      let combined = [...synced];
-      // If records are fewer than 95 or full seed flag isn't set, merge with full 95 dataset
-      if (combined.length < 95 || !hasFullSeeded) {
-        const recordMap = new Map<string, StudentRecord>();
-        allSamples.forEach(r => recordMap.set(r.id, r));
-        synced.forEach(r => recordMap.set(r.id, r)); // synced overrides or adds
-        combined = Array.from(recordMap.values());
-        
-        localStorage.setItem('aiou_95_seeded_v2', 'true');
-        localStorage.setItem('aiou_seeded', 'true');
-        
-        // Save merged 95 back to local storage
-        saveLocalRecords(combined);
-        
-        // Push any missing sample records to Firestore in background
-        for (const sample of combined) {
-          if (!synced.some(s => s.id === sample.id)) {
-            saveStudentRecord(sample).catch(() => {});
-          }
-        }
+      // If database is completely empty and no genuine user records exist yet, fallback to local storage
+      if (realRecords.length === 0) {
+        const local = getLocalRecords();
+        realRecords = local.filter(r => !r.remarks?.includes('AIOU Student record #'));
+      }
+
+      // If still completely empty (brand new account), load the base 2 initial sample records
+      if (realRecords.length === 0) {
+        const initialSamples = getSampleRecords().slice(0, 2);
+        realRecords = initialSamples;
       }
 
       // Sort by updatedAt descending
-      combined.sort((a, b) => {
+      realRecords.sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return tB - tA;
       });
 
-      setRecords(combined);
+      // Save clean dataset back to local storage
+      saveLocalRecords(realRecords);
+      setRecords(realRecords);
       setSyncStatus('synced');
     } catch (error) {
       console.error('Failed to load database records:', error);
       setSyncStatus('failed');
       
-      // Fallback: Read local storage records
+      // Fallback: Read local storage records filtered for genuine user records
       const local = getLocalRecords();
-      const allSamples = getSampleRecords(); // 95 complete records
-      const hasFullSeeded = localStorage.getItem('aiou_95_seeded_v2') === 'true';
-
-      let combined = [...local];
-      if (combined.length < 95 || !hasFullSeeded) {
-        const recordMap = new Map<string, StudentRecord>();
-        allSamples.forEach(r => recordMap.set(r.id, r));
-        local.forEach(r => recordMap.set(r.id, r));
-        combined = Array.from(recordMap.values());
-
-        localStorage.setItem('aiou_95_seeded_v2', 'true');
-        localStorage.setItem('aiou_seeded', 'true');
-        saveLocalRecords(combined);
+      let realRecords = local.filter(r => !r.remarks?.includes('AIOU Student record #'));
+      
+      if (realRecords.length === 0) {
+        realRecords = getSampleRecords().slice(0, 2);
       }
 
-      combined.sort((a, b) => {
+      realRecords.sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return tB - tA;
       });
 
-      setRecords(combined);
+      setRecords(realRecords);
     } finally {
       setLoading(false);
     }
@@ -289,6 +274,8 @@ export default function App() {
         onLogout={handleLogout}
         theme={theme}
         setTheme={setTheme}
+        currentView={currentView}
+        onNavigate={(view) => setCurrentView(view)}
       />
 
       {/* Quota limit fallback notification */}
