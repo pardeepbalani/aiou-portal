@@ -219,8 +219,6 @@ export default function App() {
       setCurrentView('dashboard');
     } else if (currentView === 'semester_courses') {
       setCurrentView('dashboard');
-    } else if (currentView === 'tutorship') {
-      setCurrentView('dashboard');
     } else if (currentView === 'research_records') {
       setCurrentView('dashboard');
     } else if (currentView === 'f2f_workshop') {

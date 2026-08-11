@@ -766,10 +766,10 @@ export default function ExamRecordsModule({
       return;
     }
     const updatedCodes = [...examCourseCodes, code];
-    const updatedDates = [...examDatesList, { 
+    const updatedDates: CourseExamDate[] = [...examDatesList, { 
       courseCode: code, 
       examDate: '', 
-      status: 'Pending', 
+      status: 'Pending' as const, 
       reappearDate: '', 
       remarks: '' 
     }];
@@ -969,12 +969,12 @@ export default function ExamRecordsModule({
       // Load all codes into active state
       setExamCourseCodes(codes);
       
-      const newDates = codes.map(code => {
+      const newDates: CourseExamDate[] = codes.map(code => {
         const existing = examDatesList.find(d => d.courseCode === code);
         return existing || {
           courseCode: code,
           examDate: '',
-          status: 'Pending',
+          status: 'Pending' as const,
           reappearDate: '',
           remarks: ''
         };

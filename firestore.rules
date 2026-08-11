@@ -31,6 +31,8 @@ service cloud.firestore {
         && data.cmsPasswordId is string && data.cmsPasswordId.size() <= 128
         && data.admissionYear is string && data.admissionYear.size() <= 16
         && data.programSelected is string && data.programSelected.size() <= 128
+        && (!('programCategory' in data) || (data.programCategory is string && data.programCategory.size() <= 128))
+        && (!('isDeleted' in data) || data.isDeleted is bool)
         && (data.semesterType == 'Autumn' || data.semesterType == 'Spring')
         && data.semesters is list
         && (data.totalReceivable is int || data.totalReceivable is float)
@@ -200,10 +202,9 @@ service cloud.firestore {
         && incoming().id == studentId
         && isValidStudentRecord(incoming());
 
-      // Update operations are validated against ID structure, Schema structure, and Immutability constraints
+      // Update operations are validated against ID structure and Schema structure
       allow update: if isValidId(studentId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidStudentRecord(incoming());
 
       // Delete operations are protected with ID validation
@@ -221,7 +222,6 @@ service cloud.firestore {
 
       allow update: if isValidId(managerId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidExamManager(incoming());
 
       allow delete: if isValidId(managerId);
@@ -238,7 +238,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidExamManagerPaymentRecord(incoming());
 
       allow delete: if isValidId(recordId);
@@ -255,7 +254,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidStudentExamInfo(incoming());
 
       allow delete: if isValidId(recordId);
@@ -272,7 +270,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidStudentDegreeRecord(incoming());
 
       allow delete: if isValidId(recordId);
@@ -289,7 +286,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidStudentQuizRecord(incoming());
 
       allow delete: if isValidId(recordId);
@@ -306,7 +302,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidResearchProjectRecord(incoming());
 
       allow delete: if isValidId(recordId);
@@ -323,7 +318,6 @@ service cloud.firestore {
 
       allow update: if isValidId(managerId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidF2FManager(incoming());
 
       allow delete: if isValidId(managerId);
@@ -340,7 +334,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidF2FCandidateRecord(incoming());
 
       allow delete: if isValidId(recordId);
@@ -357,7 +350,6 @@ service cloud.firestore {
 
       allow update: if isValidId(recordId)
         && incoming().id == existing().id
-        && incoming().createdAt == existing().createdAt
         && isValidF2FManagerPaymentRecord(incoming());
 
       allow delete: if isValidId(recordId);

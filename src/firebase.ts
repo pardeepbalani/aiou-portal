@@ -313,7 +313,8 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
   try {
     await ensureAuthenticated();
     const docRef = doc(db, COLLECTION_NAME, updatedRecord.id);
-    await setDoc(docRef, updatedRecord);
+    const cleanData = cleanObjectForFirestore(updatedRecord);
+    await setDoc(docRef, cleanData);
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.warn('Firestore write failed, using local fallback. Error:', error);
@@ -329,8 +330,15 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
   let remoteRecords: StudentRecord[] = [];
   try {
     await ensureAuthenticated();
-    const q = query(collection(db, COLLECTION_NAME), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      const q = query(collection(db, COLLECTION_NAME), orderBy('updatedAt', 'desc'));
+      querySnapshot = await getDocs(q);
+    } catch (e) {
+      console.warn('Fallback students_records query without orderBy:', e);
+      querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+    }
+
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -341,7 +349,7 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
             remoteRecords.push(record);
           } else {
             // Hard-delete or soft-delete remote record to match local deletion
-            setDoc(doc.ref, { ...record, isDeleted: true, updatedAt: new Date().toISOString() })
+            setDoc(doc.ref, cleanObjectForFirestore({ ...record, isDeleted: true, updatedAt: new Date().toISOString() }))
               .catch(e => console.warn('Delayed soft-delete sync failed for', record.id, e));
           }
         } else {
@@ -400,7 +408,7 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     
     if (isNewerThanRemote) {
       try {
-        await setDoc(doc(db, COLLECTION_NAME, record.id), record);
+        await setDoc(doc(db, COLLECTION_NAME, record.id), cleanObjectForFirestore(record));
         setQuotaExceeded(false); // Self-healing: clear quota flag on success
       } catch (e) {
         console.warn('Sync back to Firestore failed for', record.id, e);
@@ -544,7 +552,7 @@ export async function saveExamManager(manager: ExamManager): Promise<void> {
   try {
     await ensureAuthenticated();
     const docRef = doc(db, EXAM_MANAGERS_COLLECTION, updatedManager.id);
-    await setDoc(docRef, updatedManager);
+    await setDoc(docRef, cleanObjectForFirestore(updatedManager));
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.warn('Firestore write failed for Exam Manager, using local fallback. Error:', error);
@@ -557,8 +565,14 @@ export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
   let remoteRecords: ExamManager[] = [];
   try {
     await ensureAuthenticated();
-    const q = query(collection(db, EXAM_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      const q = query(collection(db, EXAM_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
+      querySnapshot = await getDocs(q);
+    } catch (e) {
+      console.warn('Fallback exam_managers query without orderBy:', e);
+      querySnapshot = await getDocs(collection(db, EXAM_MANAGERS_COLLECTION));
+    }
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -635,7 +649,7 @@ export async function saveStudentExamInfo(record: StudentExamInfo): Promise<void
   try {
     await ensureAuthenticated();
     const docRef = doc(db, EXAM_RECORDS_COLLECTION, updatedRecord.id);
-    await setDoc(docRef, updatedRecord);
+    await setDoc(docRef, cleanObjectForFirestore(updatedRecord));
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
   } catch (error) {
     console.warn('Firestore write failed for Student Exam Info, using local fallback. Error:', error);
@@ -648,8 +662,14 @@ export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]>
   let remoteRecords: StudentExamInfo[] = [];
   try {
     await ensureAuthenticated();
-    const q = query(collection(db, EXAM_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      const q = query(collection(db, EXAM_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
+      querySnapshot = await getDocs(q);
+    } catch (e) {
+      console.warn('Fallback exam_records query without orderBy:', e);
+      querySnapshot = await getDocs(collection(db, EXAM_RECORDS_COLLECTION));
+    }
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -706,14 +726,11 @@ export async function deleteStudentExamInfo(id: string): Promise<void> {
 const DEGREE_RECORDS_COLLECTION = 'degree_records';
 const LOCAL_DEGREE_RECORDS_KEY = 'aiou_local_degree_records';
 
-export function cleanObjectForFirestore(obj: Record<string, any>): Record<string, any> {
-  const result: Record<string, any> = {};
-  Object.keys(obj).forEach(key => {
-    if (obj[key] !== undefined) {
-      result[key] = obj[key];
-    }
-  });
-  return result;
+export function cleanObjectForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj, (key, value) => {
+    return value === undefined ? null : value;
+  }));
 }
 
 export function sanitizeStudentDegreeRecord(r: any): StudentDegreeRecord {
