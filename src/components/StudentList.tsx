@@ -19,7 +19,8 @@ import {
   Trash2,
   FileSpreadsheet,
   Printer,
-  Coins
+  Coins,
+  Eye
 } from 'lucide-react';
 
 interface StudentListProps {
@@ -517,13 +518,16 @@ export default function StudentList({
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => onSelectStudent(r)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer transition-all ${
+                            id={`preview-student-${r.id}`}
+                            title="Preview Student Record"
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer transition-all shadow-3xs ${
                               isGreen
-                                ? 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
-                                : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100'
                             }`}
                           >
-                            Open Details
+                            <Eye size={14} className={isGreen ? 'text-emerald-700 font-bold' : 'text-sky-700 font-bold'} />
+                            <span>Preview</span>
                           </button>
                           
                           {/* Inline Delete trigger */}

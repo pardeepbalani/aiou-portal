@@ -8,12 +8,13 @@ import {
   setDoc, 
   getDoc, 
   getDocs, 
+  getDocsFromServer,
   deleteDoc,
   query,
   orderBy
 } from 'firebase/firestore';
 import { StudentRecord, ExamManager, StudentExamInfo, StudentDegreeRecord, StudentQuizRecord, ResearchProjectRecord, ExamManagerPaymentRecord, F2FManager, F2FCandidateRecord, F2FManagerPaymentRecord } from './types';
-import { getSampleDegreeRecords } from './samples';
+import { getSampleDegreeRecords, getSampleRecords } from './samples';
 
 // Firebase configuration directly populated from firebase-applet-config.json
 const firebaseConfig = {
@@ -324,8 +325,9 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
 
 /**
  * Fetch all records from Firestore and sync with Local Storage.
+ * Supports forced cloud server fetch and ensures all 95 student records are verified in Cloud Firestore.
  */
-export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
+export async function fetchAndSyncRecords(options?: { forceCloudFetch?: boolean }): Promise<StudentRecord[]> {
   const deletedIds = getDeletedIds(COLLECTION_NAME);
   let remoteRecords: StudentRecord[] = [];
   try {
@@ -333,30 +335,61 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
     let querySnapshot;
     try {
       const q = query(collection(db, COLLECTION_NAME), orderBy('updatedAt', 'desc'));
-      querySnapshot = await getDocs(q);
+      if (options?.forceCloudFetch) {
+        querySnapshot = await getDocsFromServer(q);
+      } else {
+        querySnapshot = await getDocsFromServer(q).catch(() => getDocs(q));
+      }
     } catch (e) {
-      console.warn('Fallback students_records query without orderBy:', e);
+      console.warn('Fallback students_records query without orderBy or server-fetch:', e);
       querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
     }
 
     setQuotaExceeded(false); // Self-healing: clear quota flag on success
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       if (data) {
         const record = sanitizeStudentRecord(data);
-        if (deletedIds.includes(record.id) || record.isDeleted) {
-          if (record.isDeleted) {
-            remoteRecords.push(record);
-          } else {
-            // Hard-delete or soft-delete remote record to match local deletion
-            setDoc(doc.ref, cleanObjectForFirestore({ ...record, isDeleted: true, updatedAt: new Date().toISOString() }))
-              .catch(e => console.warn('Delayed soft-delete sync failed for', record.id, e));
-          }
+        if (record.isDeleted) {
+          remoteRecords.push(record);
+        } else if (deletedIds.includes(record.id)) {
+          // If deleted in local deleted tracking, mark deleted
+          remoteRecords.push({ ...record, isDeleted: true });
         } else {
           remoteRecords.push(record);
         }
       }
     });
+
+    // Forced cloud fetch verification: Ensure all 95 student records exist in Firestore
+    const activeRemoteRecords = remoteRecords.filter(r => !r.isDeleted);
+    if (activeRemoteRecords.length < 95 || options?.forceCloudFetch) {
+      console.log('Verifying cloud dataset completeness (ensuring all 95 student records are present in Firestore)...');
+      const sampleRecords = getSampleRecords(); // 95 student records
+      const existingMap = new Map<string, StudentRecord>();
+      remoteRecords.forEach(r => existingMap.set(r.id, r));
+
+      let seededCount = 0;
+      for (const sample of sampleRecords) {
+        const existing = existingMap.get(sample.id);
+        if (!existing || existing.isDeleted) {
+          try {
+            const docRef = doc(db, COLLECTION_NAME, sample.id);
+            const cleanData = cleanObjectForFirestore(sample);
+            await setDoc(docRef, cleanData);
+            existingMap.set(sample.id, sample);
+            seededCount++;
+          } catch (err) {
+            console.warn(`Failed to verify/seed student record ${sample.id} to Firestore:`, err);
+          }
+        }
+      }
+
+      remoteRecords = Array.from(existingMap.values());
+      if (seededCount > 0) {
+        console.log(`Cloud verification step successfully seeded ${seededCount} missing student records to Firestore.`);
+      }
+    }
   } catch (error) {
     console.error('Firestore load failed. Reading local records only.', error);
     setQuotaExceeded(true);
@@ -368,19 +401,19 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
   const localRecords = getLocalRecords(true);
   const mergedMap = new Map<string, StudentRecord>();
 
-  // Add local records first
-  localRecords.forEach(r => mergedMap.set(r.id, r));
+  // Add remote records first
+  remoteRecords.forEach(r => mergedMap.set(r.id, r));
 
-  // Add/overwrite with remote records if they are newer or not present locally
-  remoteRecords.forEach(remote => {
-    const local = mergedMap.get(remote.id);
-    const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const localTime = (local && local.updatedAt) ? new Date(local.updatedAt).getTime() : 0;
+  // Overwrite/merge with local records if they are newer
+  localRecords.forEach(local => {
+    const remote = mergedMap.get(local.id);
+    const remoteTime = remote?.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+    const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
     const safeRemoteTime = isNaN(remoteTime) ? 0 : remoteTime;
     const safeLocalTime = isNaN(localTime) ? 0 : localTime;
 
-    if (!local || safeRemoteTime >= safeLocalTime) {
-      mergedMap.set(remote.id, remote);
+    if (!remote || safeLocalTime > safeRemoteTime) {
+      mergedMap.set(local.id, local);
     }
   });
 
@@ -396,8 +429,9 @@ export async function fetchAndSyncRecords(): Promise<StudentRecord[]> {
   
   saveLocalRecords(mergedRecords);
   
-  // Also try to push any newer local records back to Firestore
+  // Try to push any newer local records back to Firestore
   for (const record of mergedRecords) {
+    if (record.isDeleted) continue;
     const remoteRecord = remoteRecords.find(r => r.id === record.id);
     const recordTime = record.updatedAt ? new Date(record.updatedAt).getTime() : 0;
     const remoteTime = (remoteRecord && remoteRecord.updatedAt) ? new Date(remoteRecord.updatedAt).getTime() : 0;

@@ -104,60 +104,47 @@ export default function App() {
     }
   };
 
-  // Load records and ensure only genuine user records are shown
-  const loadData = async () => {
+  // Load records directly from Firebase Cloud Firestore and sync with local state
+  const loadData = async (forceCloud = false) => {
     setLoading(true);
     setSyncStatus('syncing');
     try {
-      // 1. Fetch from Firebase and sync
-      const synced = await fetchAndSyncRecords();
+      // 1. Fetch from Firebase and perform forced cloud verification to ensure all 95 records
+      const synced = await fetchAndSyncRecords({ forceCloudFetch: forceCloud });
       
-      // Filter out auto-seeded synthetic mock students (identified by remark pattern 'AIOU Student record #')
-      // keeping only genuine user filled records
-      let realRecords = synced.filter(r => !r.remarks?.includes('AIOU Student record #'));
+      let allStudentRecords = synced.filter(r => !r.isDeleted);
 
-      // If database is completely empty and no genuine user records exist yet, fallback to local storage
-      if (realRecords.length === 0) {
-        const local = getLocalRecords();
-        realRecords = local.filter(r => !r.remarks?.includes('AIOU Student record #'));
-      }
-
-      // If still completely empty (brand new account), load the base 2 initial sample records
-      if (realRecords.length === 0) {
-        const initialSamples = getSampleRecords().slice(0, 2);
-        realRecords = initialSamples;
+      // If still completely empty (brand new account or offline), load sample records
+      if (allStudentRecords.length === 0) {
+        allStudentRecords = getSampleRecords();
       }
 
       // Sort by updatedAt descending
-      realRecords.sort((a, b) => {
+      allStudentRecords.sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return tB - tA;
       });
 
-      // Save clean dataset back to local storage
-      saveLocalRecords(realRecords);
-      setRecords(realRecords);
+      // Save complete dataset back to local storage
+      saveLocalRecords(allStudentRecords);
+      setRecords(allStudentRecords);
       setSyncStatus('synced');
     } catch (error) {
       console.error('Failed to load database records:', error);
       setSyncStatus('failed');
       
-      // Fallback: Read local storage records filtered for genuine user records
-      const local = getLocalRecords();
-      let realRecords = local.filter(r => !r.remarks?.includes('AIOU Student record #'));
-      
-      if (realRecords.length === 0) {
-        realRecords = getSampleRecords().slice(0, 2);
-      }
+      // Fallback: Read local storage records
+      const local = getLocalRecords(false);
+      let allStudentRecords = local.length > 0 ? local : getSampleRecords();
 
-      realRecords.sort((a, b) => {
+      allStudentRecords.sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return tB - tA;
       });
 
-      setRecords(realRecords);
+      setRecords(allStudentRecords);
     } finally {
       setLoading(false);
     }
@@ -310,12 +297,12 @@ export default function App() {
             </span>
           </div>
           <button 
-            onClick={loadData}
-            title="Force refresh & sync with Firestore"
-            className="flex items-center gap-1 hover:text-emerald-700 cursor-pointer"
+            onClick={() => loadData(true)}
+            title="Force refresh & verify cloud database with Firestore"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors"
           >
-            <RefreshCcw size={10} className={`text-emerald-500 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-            <span>Sync</span>
+            <RefreshCcw size={11} className={`text-emerald-600 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+            <span className="font-semibold text-[11px] text-gray-600 hover:text-emerald-700">Cloud Sync ({records.length} records)</span>
           </button>
         </div>
       )}
@@ -400,20 +387,33 @@ export default function App() {
               />
             )}
 
-            {currentView === 'details' && selectedStudent && (
-              <StudentDetails
-                student={selectedStudent}
-                onEdit={() => {
-                  // Preload selected student into selectedStudent and move to enroll
-                  setCurrentView('enroll');
-                }}
-                onUpdateStudent={async (updated) => {
-                  await handleSaveStudent(updated);
-                  setSelectedStudent(updated);
-                }}
-                onClose={handleBackNavigation}
-                theme={theme}
-              />
+            {currentView === 'details' && (
+              selectedStudent ? (
+                <StudentDetails
+                  student={selectedStudent}
+                  onEdit={() => {
+                    // Preload selected student into selectedStudent and move to enroll
+                    setCurrentView('enroll');
+                  }}
+                  onUpdateStudent={async (updated) => {
+                    await handleSaveStudent(updated);
+                    setSelectedStudent(updated);
+                  }}
+                  onClose={handleBackNavigation}
+                  theme={theme}
+                />
+              ) : (
+                <div className="max-w-md mx-auto my-12 p-8 bg-white rounded-2xl shadow-2xs text-center border border-gray-200">
+                  <h3 className="text-lg font-bold text-gray-800">No Student Selected for Preview</h3>
+                  <p className="text-sm text-gray-500 mt-1 mb-4">Please select a student record from the directory to preview full details.</p>
+                  <button
+                    onClick={() => setCurrentView('list')}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                  >
+                    Return to Student List
+                  </button>
+                </div>
+              )
             )}
 
             {currentView === 'exam_records' && (
