@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { 
   LogOut, 
   ArrowLeft, 
@@ -10,7 +10,12 @@ import {
   Users2, 
   Bell, 
   BookOpenCheck, 
-  FileText 
+  FileText,
+  RefreshCcw,
+  Cloud,
+  Download,
+  Upload,
+  Trash2
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -22,6 +27,11 @@ interface HeaderProps {
   setTheme: (theme: 'green' | 'blue') => void;
   currentView?: string;
   onNavigate?: (view: 'dashboard' | 'list' | 'admission' | 'exam_records' | 'degree_records' | 'f2f_workshop' | 'quiz_records' | 'semester_courses' | 'research_records') => void;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'failed';
+  onSync?: () => void;
+  onExportBackup?: () => void;
+  onImportBackup?: (file: File) => void;
+  onDeleteDemoRecords?: () => void;
 }
 
 export default function Header({
@@ -33,8 +43,22 @@ export default function Header({
   setTheme,
   currentView = 'dashboard',
   onNavigate,
+  syncStatus = 'synced',
+  onSync,
+  onExportBackup,
+  onImportBackup,
+  onDeleteDemoRecords
 }: HeaderProps) {
   const isGreen = theme === 'green';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportBackup) {
+      onImportBackup(file);
+      e.target.value = ''; // Reset input
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -90,8 +114,83 @@ export default function Header({
           </div>
         </div>
 
-        {/* Right: Theme Toggle & Logout */}
-        <div className="flex items-center justify-end gap-3">
+        {/* Right: Theme Toggle, Backup/Restore & Logout */}
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
+          {/* Export / Restore Backup Buttons */}
+          {isLoggedIn && (
+            <div className="flex items-center gap-1.5">
+              {onExportBackup && (
+                <button
+                  onClick={onExportBackup}
+                  id="header-export-backup-btn"
+                  title="Export all student records and system data from Local Storage to a JSON backup file"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                >
+                  <Download size={14} className="text-blue-700" />
+                  <span className="hidden md:inline">Export JSON Backup</span>
+                  <span className="inline md:hidden">Export</span>
+                </button>
+              )}
+
+              {onImportBackup && (
+                <>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".json"
+                    className="hidden"
+                    id="header-import-file-input"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    id="header-import-backup-btn"
+                    title="Import student records from a JSON backup file into Local Storage"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-purple-200 bg-purple-50 text-purple-800 hover:bg-purple-100 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Upload size={14} className="text-purple-700" />
+                    <span className="hidden md:inline">Import JSON Backup</span>
+                    <span className="inline md:hidden">Import</span>
+                  </button>
+                </>
+              )}
+
+              {onDeleteDemoRecords && (
+                <button
+                  onClick={onDeleteDemoRecords}
+                  id="header-delete-demo-btn"
+                  title="Delete all pre-populated demo student records"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                >
+                  <Trash2 size={14} className="text-rose-700" />
+                  <span className="hidden md:inline">Delete Demo Records</span>
+                  <span className="inline md:hidden">Delete Demos</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Cloud Sync Button */}
+          {isLoggedIn && onSync && (
+            <button
+              onClick={onSync}
+              disabled={syncStatus === 'syncing'}
+              title="Force Sync with Cloud Database"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                syncStatus === 'syncing'
+                  ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'
+                  : syncStatus === 'failed'
+                  ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+              }`}
+            >
+              <RefreshCcw size={13} className={syncStatus === 'syncing' ? 'animate-spin text-amber-600' : 'text-emerald-700'} />
+              <span className="hidden md:inline">
+                {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'failed' ? 'Sync Error (Retry)' : 'Cloud Synced'}
+              </span>
+            </button>
+          )}
+
           {/* Theme switcher */}
           <div className="flex bg-gray-100 rounded-xl p-1 border border-gray-200">
             <button

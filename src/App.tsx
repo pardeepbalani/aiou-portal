@@ -14,7 +14,18 @@ import ResearchProjectModule from './components/ResearchProjectModule';
 import F2FWorkshopModule from './components/F2FWorkshopModule';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
-import { fetchAndSyncRecords, saveStudentRecord, deleteStudentRecord, getLocalRecords, saveLocalRecords, isQuotaExceeded } from './firebase';
+import { 
+  fetchAndSyncRecords, 
+  saveStudentRecord, 
+  deleteStudentRecord, 
+  getLocalRecords, 
+  saveLocalRecords, 
+  isQuotaExceeded,
+  syncAllModulesToCloud,
+  exportAllDataToJSON,
+  importAllDataFromJSON,
+  deleteAllDemoStudentRecords
+} from './firebase';
 import { getSampleRecords } from './samples';
 import { RefreshCcw, Download, Smartphone, Share, X, PlusSquare, AlertCircle } from 'lucide-react';
 
@@ -33,7 +44,9 @@ export default function App() {
   });
 
   // Data States
-  const [records, setRecords] = useState<StudentRecord[]>([]);
+  const [records, setRecords] = useState<StudentRecord[]>(() => {
+    return getLocalRecords(false);
+  });
   const [loading, setLoading] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
 
@@ -109,15 +122,14 @@ export default function App() {
     setLoading(true);
     setSyncStatus('syncing');
     try {
-      // 1. Fetch from Firebase and perform forced cloud verification to ensure all 95 records
+      if (forceCloud) {
+        await syncAllModulesToCloud();
+      }
+
+      // Fetch from Firebase and perform cloud verification to load all student records
       const synced = await fetchAndSyncRecords({ forceCloudFetch: forceCloud });
       
       let allStudentRecords = synced.filter(r => !r.isDeleted);
-
-      // If still completely empty (brand new account or offline), load sample records
-      if (allStudentRecords.length === 0) {
-        allStudentRecords = getSampleRecords();
-      }
 
       // Sort by updatedAt descending
       allStudentRecords.sort((a, b) => {
@@ -126,7 +138,7 @@ export default function App() {
         return tB - tA;
       });
 
-      // Save complete dataset back to local storage
+      // Save synced dataset back to local storage
       saveLocalRecords(allStudentRecords);
       setRecords(allStudentRecords);
       setSyncStatus('synced');
@@ -134,9 +146,9 @@ export default function App() {
       console.error('Failed to load database records:', error);
       setSyncStatus('failed');
       
-      // Fallback: Read local storage records
+      // Fallback: Read local storage records without forcing fake sample data
       const local = getLocalRecords(false);
-      let allStudentRecords = local.length > 0 ? local : getSampleRecords();
+      let allStudentRecords = local.filter(r => !r.isDeleted);
 
       allStudentRecords.sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
@@ -147,6 +159,65 @@ export default function App() {
       setRecords(allStudentRecords);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFullSync = async () => {
+    await loadData(true);
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const jsonStr = exportAllDataToJSON();
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `AIOU_System_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('Failed to generate export backup file: ' + (e?.message || e));
+    }
+  };
+
+  const handleImportBackup = async (file: File) => {
+    try {
+      setLoading(true);
+      setSyncStatus('syncing');
+      const text = await file.text();
+      const result = await importAllDataFromJSON(text);
+      if (result.success) {
+        alert(result.message);
+        await loadData(true);
+      } else {
+        alert('Import Error: ' + result.message);
+        setSyncStatus('failed');
+      }
+    } catch (e: any) {
+      alert('Failed to read backup file: ' + (e?.message || e));
+      setSyncStatus('failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDemoRecords = async () => {
+    if (window.confirm('Are you sure you want to delete all demo/sample student records? Real student records will not be affected.')) {
+      setLoading(true);
+      setSyncStatus('syncing');
+      try {
+        const res = await deleteAllDemoStudentRecords();
+        alert(res.message);
+        await loadData(true);
+      } catch (err: any) {
+        alert('Failed to delete demo records: ' + (err?.message || err));
+        setSyncStatus('failed');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -261,6 +332,11 @@ export default function App() {
         setTheme={setTheme}
         currentView={currentView}
         onNavigate={(view) => setCurrentView(view)}
+        syncStatus={syncStatus}
+        onSync={handleFullSync}
+        onExportBackup={handleExportBackup}
+        onImportBackup={handleImportBackup}
+        onDeleteDemoRecords={handleDeleteDemoRecords}
       />
 
       {/* Quota limit fallback notification */}
@@ -384,6 +460,9 @@ export default function App() {
                 }}
                 onDeleteStudent={handleDeleteStudent}
                 theme={theme}
+                onExportBackup={handleExportBackup}
+                onImportBackup={handleImportBackup}
+                onDeleteDemoRecords={handleDeleteDemoRecords}
               />
             )}
 

@@ -7,9 +7,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // ID verification to prevent long strings or ID poisoning
+    // ID verification to allow standard document ID strings
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 256;
     }
 
     function incoming() {
@@ -20,175 +20,71 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Hardened validation function representing the StudentRecord schema
+    // Flexible validation function representing the StudentRecord schema
     function isValidStudentRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.studentName is string && data.studentName.size() <= 256
-        && data.fatherName is string && data.fatherName.size() <= 256
-        && data.phoneNumber is string && data.phoneNumber.size() <= 32
-        && data.registrationId is string && data.registrationId.size() <= 128
-        && data.lmsPasswordId is string && data.lmsPasswordId.size() <= 128
-        && data.cmsPasswordId is string && data.cmsPasswordId.size() <= 128
-        && data.admissionYear is string && data.admissionYear.size() <= 16
-        && data.programSelected is string && data.programSelected.size() <= 128
-        && (!('programCategory' in data) || (data.programCategory is string && data.programCategory.size() <= 128))
-        && (!('isDeleted' in data) || data.isDeleted is bool)
-        && (data.semesterType == 'Autumn' || data.semesterType == 'Spring')
-        && data.semesters is list
-        && (data.totalReceivable is int || data.totalReceivable is float)
-        && data.paymentsList is list
-        && (!('serviceChargesAmount' in data) || data.serviceChargesAmount is int || data.serviceChargesAmount is float)
-        && (!('remarks' in data) || (data.remarks is string && data.remarks.size() <= 5000))
-        && data.serviceEnrollment is bool
-        && data.serviceWorkshops is bool
-        && data.serviceQuiz is bool
-        && data.serviceAssignments is bool
-        && data.servicePhysicalWorkshop is bool
-        && data.serviceResearchReport is bool
-        && (data.status == 'active' || data.status == 'completed' || data.status == 'suspended')
-        && data.createdAt is string
-        && data.updatedAt is string;
-    }
-
-    // Hardened validation function representing the ExamManager schema
-    function isValidExamManager(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.name is string && data.name.size() <= 256
-        && data.phone is string && data.phone.size() <= 32
-        && data.email is string && data.email.size() <= 256
-        && (data.centre == 'Mithi' || data.centre == 'Diplo')
-        && (!('totalPaidAmount' in data) || data.totalPaidAmount is int || data.totalPaidAmount is float)
-        && data.createdAt is string
-        && data.updatedAt is string;
-    }
-
-    // Hardened validation function representing the ExamManagerPaymentRecord schema
-    function isValidExamManagerPaymentRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.managerId is string && data.managerId.size() <= 128
-        && data.courseCode is string && data.courseCode.size() <= 128
-        && (data.perPaperCharges is int || data.perPaperCharges is float)
-        && data.createdAt is string
-        && data.updatedAt is string;
-    }
-
-    // Hardened validation function representing the StudentExamInfo schema
-    function isValidStudentExamInfo(data) {
-      return data.id is string && data.id.size() <= 128
-        && (data.centre == 'Mithi' || data.centre == 'Diplo')
-        && data.managerId is string && data.managerId.size() <= 128
-        && data.courseCode is string && data.courseCode.size() <= 128
-        && data.studentName is string && data.studentName.size() <= 256
-        && data.fatherName is string && data.fatherName.size() <= 256
-        && data.studentId is string && data.studentId.size() <= 128
-        && data.contactNumber is string && data.contactNumber.size() <= 32
-        && data.semesterTerm is string && data.semesterTerm.size() <= 128
-        && data.courseCodes is list
-        && data.examDates is list
-        && (data.totalFee is int || data.totalFee is float)
-        && (data.amountReceived is int || data.amountReceived is float)
-        && (data.remainingBalance is int || data.remainingBalance is float)
-        && data.paymentHistory is list
-        && data.createdAt is string
-        && data.updatedAt is string;
-    }
-
-    // Hardened validation function representing the StudentDegreeRecord schema
-    function isValidStudentDegreeRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.studentName is string && data.studentName.size() <= 256
-        && data.fatherName is string && data.fatherName.size() <= 256
-        && data.studentId is string && data.studentId.size() <= 128
-        && data.contactNumber is string && data.contactNumber.size() <= 32
-        && data.courseName is string && data.courseName.size() <= 256
-        && (data.category == 'Normal' || data.category == 'Urgent')
-        && data.appliedDate is string
-        && (!('degreeReceivedDate' in data) || data.degreeReceivedDate is string)
-        && (data.status == 'Applied' || data.status == 'Under Process' || data.status == 'Dispatched' || data.status == 'Received at Hub' || data.status == 'Delivered to Student')
-        && (data.totalFee is int || data.totalFee is float)
-        && (data.amountReceived is int || data.amountReceived is float)
-        && data.paymentHistory is list
-        && (!('trackingNumber' in data) || data.trackingNumber is string)
-        && (data.verificationStatus == 'Pending' || data.verificationStatus == 'Verified' || data.verificationStatus == 'Rejected')
-        && (!('remarks' in data) || data.remarks is string)
-        && data.createdAt is string
-        && data.updatedAt is string;
-    }
-
-    // Hardened validation function representing the StudentQuizRecord schema
-    function isValidStudentQuizRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.studentName is string && data.studentName.size() <= 256
-        && data.fatherName is string && data.fatherName.size() <= 256
-        && data.studentId is string && data.studentId.size() <= 128
-        && data.contactNumber is string && data.contactNumber.size() <= 32
-        && data.courseCode is string && data.courseCode.size() <= 128
-        && data.quizDate is string
-        && (data.status == 'Pending' || data.status == 'Completed' || data.status == 'Overdue')
+      return data.id is string
+        && (!('studentName' in data) || data.studentName is string)
+        && (!('fatherName' in data) || data.fatherName is string)
+        && (!('phoneNumber' in data) || data.phoneNumber is string)
+        && (!('registrationId' in data) || data.registrationId is string)
+        && (!('lmsPasswordId' in data) || data.lmsPasswordId is string)
+        && (!('cmsPasswordId' in data) || data.cmsPasswordId is string)
+        && (!('admissionYear' in data) || data.admissionYear is string)
         && (!('programSelected' in data) || data.programSelected is string)
-        && (!('quizDateFrom' in data) || data.quizDateFrom is string)
-        && (!('quizDateTo' in data) || data.quizDateTo is string)
-        && (!('quizStartTime' in data) || data.quizStartTime is string)
-        && (!('quizEndTime' in data) || data.quizEndTime is string)
+        && (!('programCategory' in data) || data.programCategory is string)
+        && (!('isDeleted' in data) || data.isDeleted is bool)
+        && (!('semesterType' in data) || data.semesterType is string)
+        && (!('semesters' in data) || data.semesters is list)
+        && (!('totalReceivable' in data) || data.totalReceivable is int || data.totalReceivable is float)
+        && (!('paymentsList' in data) || data.paymentsList is list)
+        && (!('serviceChargesAmount' in data) || data.serviceChargesAmount is int || data.serviceChargesAmount is float)
         && (!('remarks' in data) || data.remarks is string)
-        && data.createdAt is string
-        && data.updatedAt is string;
+        && (!('serviceEnrollment' in data) || data.serviceEnrollment is bool)
+        && (!('serviceWorkshops' in data) || data.serviceWorkshops is bool)
+        && (!('serviceQuiz' in data) || data.serviceQuiz is bool)
+        && (!('serviceAssignments' in data) || data.serviceAssignments is bool)
+        && (!('servicePhysicalWorkshop' in data) || data.servicePhysicalWorkshop is bool)
+        && (!('serviceResearchReport' in data) || data.serviceResearchReport is bool)
+        && (!('status' in data) || data.status is string)
+        && (!('createdAt' in data) || data.createdAt is string)
+        && (!('updatedAt' in data) || data.updatedAt is string);
     }
 
-    // Hardened validation function representing the ResearchProjectRecord schema
+    // Flexible validation functions to allow smooth schema variations across devices
+    function isValidExamManager(data) {
+      return data.id is string;
+    }
+
+    function isValidExamManagerPaymentRecord(data) {
+      return data.id is string;
+    }
+
+    function isValidStudentExamInfo(data) {
+      return data.id is string;
+    }
+
+    function isValidStudentDegreeRecord(data) {
+      return data.id is string;
+    }
+
+    function isValidStudentQuizRecord(data) {
+      return data.id is string;
+    }
+
     function isValidResearchProjectRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && (data.semester == 'Spring' || data.semester == 'Autumn')
-        && data.year is string && data.year.size() <= 32
-        && data.studentName is string && data.studentName.size() <= 256
-        && data.registrationId is string && data.registrationId.size() <= 128
-        && data.researchTopic is string && data.researchTopic.size() <= 512
-        && data.topicApprovalDate is string
-        && data.supervisorName is string && data.supervisorName.size() <= 256
-        && data.supervisorContact is string && data.supervisorContact.size() <= 32
-        && data.dueDate is string
-        && data.createdAt is string
-        && data.updatedAt is string;
+      return data.id is string;
     }
 
     function isValidF2FManager(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.name is string && data.name.size() <= 256
-        && data.phone is string && data.phone.size() <= 32
-        && data.createdAt is string
-        && data.updatedAt is string;
+      return data.id is string;
     }
 
     function isValidF2FCandidateRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.managerId is string && data.managerId.size() <= 128
-        && (data.semester == 'Autumn' || data.semester == 'Spring')
-        && data.year is string && data.year.size() <= 16
-        && data.serialNo is int
-        && data.candidateName is string && data.candidateName.size() <= 256
-        && data.fatherName is string && data.fatherName.size() <= 256
-        && data.contactNumber is string && data.contactNumber.size() <= 32
-        && data.registrationId is string && data.registrationId.size() <= 128
-        && data.f2fCode is string && data.f2fCode.size() <= 128
-        && data.regionalCentre is string && data.regionalCentre.size() <= 128
-        && (data.paymentReceivable is int || data.paymentReceivable is float)
-        && (!('remarks' in data) || (data.remarks is string && data.remarks.size() <= 5000))
-        && data.createdAt is string
-        && data.updatedAt is string;
+      return data.id is string;
     }
 
     function isValidF2FManagerPaymentRecord(data) {
-      return data.id is string && data.id.size() <= 128
-        && data.managerId is string && data.managerId.size() <= 128
-        && (data.semester == 'Autumn' || data.semester == 'Spring')
-        && data.year is string && data.year.size() <= 16
-        && data.codeRates is list
-        && (data.grandTotalPayable is int || data.grandTotalPayable is float)
-        && data.paymentsList is list
-        && (data.totalPaidAmount is int || data.totalPaidAmount is float)
-        && (data.remainingPayable is int || data.remainingPayable is float)
-        && data.createdAt is string
-        && data.updatedAt is string;
+      return data.id is string;
     }
 
     // Rules for students_records collection

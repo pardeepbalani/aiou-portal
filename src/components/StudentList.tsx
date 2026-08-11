@@ -20,7 +20,9 @@ import {
   FileSpreadsheet,
   Printer,
   Coins,
-  Eye
+  Eye,
+  Download,
+  Upload
 } from 'lucide-react';
 
 interface StudentListProps {
@@ -29,6 +31,9 @@ interface StudentListProps {
   onAddNewEnrollment: () => void;
   onDeleteStudent: (id: string) => Promise<void>;
   theme: 'green' | 'blue';
+  onExportBackup?: () => void;
+  onImportBackup?: (file: File) => void;
+  onDeleteDemoRecords?: () => void;
 }
 
 export default function StudentList({
@@ -37,8 +42,20 @@ export default function StudentList({
   onAddNewEnrollment,
   onDeleteStudent,
   theme,
+  onExportBackup,
+  onImportBackup,
+  onDeleteDemoRecords,
 }: StudentListProps) {
   const isGreen = theme === 'green';
+  const listFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleListFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportBackup) {
+      onImportBackup(file);
+      e.target.value = '';
+    }
+  };
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -223,19 +240,68 @@ export default function StudentList({
             Previously Enrolled Students
           </h2>
           <p className="text-gray-500 mt-1">
-            Browse, search, edit, print, or download records of all registered students.
+            Browse, search, edit, print, or backup/restore records of all registered students.
           </p>
         </div>
-        <button
-          onClick={onAddNewEnrollment}
-          id="student-list-enroll-new-button"
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold text-white transition-all duration-200 cursor-pointer shadow-2xs ${
-            isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
-          }`}
-        >
-          <PlusCircle size={16} className="text-white fill-white/20 font-bold" />
-          <span>Enroll New Student</span>
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onExportBackup && (
+            <button
+              onClick={onExportBackup}
+              id="student-list-export-json-btn"
+              title="Export all student records to a JSON backup file"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm font-bold bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition-all cursor-pointer shadow-2xs"
+            >
+              <Download size={16} className="text-blue-700" />
+              <span>Export JSON Backup</span>
+            </button>
+          )}
+
+          {onImportBackup && (
+            <>
+              <input
+                type="file"
+                ref={listFileInputRef}
+                onChange={handleListFileImport}
+                accept=".json"
+                className="hidden"
+                id="student-list-import-file-input"
+              />
+              <button
+                onClick={() => listFileInputRef.current?.click()}
+                id="student-list-import-json-btn"
+                title="Import student records from a JSON backup file into Local Storage"
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm font-bold bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 transition-all cursor-pointer shadow-2xs"
+              >
+                <Upload size={16} className="text-purple-700" />
+                <span>Import JSON Backup</span>
+              </button>
+            </>
+          )}
+
+          {onDeleteDemoRecords && (
+            <button
+              onClick={onDeleteDemoRecords}
+              id="student-list-delete-demo-btn"
+              title="Delete all pre-populated demo student records"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm font-bold bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 transition-all cursor-pointer shadow-2xs"
+            >
+              <Trash2 size={16} className="text-rose-700" />
+              <span>Delete Demo Records</span>
+            </button>
+          )}
+
+          <button
+            onClick={onAddNewEnrollment}
+            id="student-list-enroll-new-button"
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold text-white transition-all duration-200 cursor-pointer shadow-2xs ${
+              isGreen ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+            }`}
+          >
+            <PlusCircle size={16} className="text-white fill-white/20 font-bold" />
+            <span>Enroll New Student</span>
+          </button>
+        </div>
       </div>
 
       {/* FILTER & SEARCH PANEL */}
