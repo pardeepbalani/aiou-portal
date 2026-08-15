@@ -1,26 +1,26 @@
-const CACHE_NAME = "aiou-portal-cache-v1";
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = "aiou-portal-cache-v2";
+const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/manifest.json",
   "/app_icon_192.png",
   "/app_icon_512.png",
-  "/app_icon_maskable.png",
-  "/screenshot_desktop.png",
-  "/screenshot_mobile.png"
+  "/app_icon_maskable.png"
 ];
 
 // Install Event
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn("Non-fatal asset cache preload warning:", err);
+      });
     })
   );
   self.skipWaiting();
 });
 
-// Activate Event
+// Activate Event - Clean up old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -36,71 +36,85 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch Event
+// Fetch Event - Safe Network-First for Navigation & Scripts, Pass-through for Firebase/APIs
 self.addEventListener("fetch", (event) => {
-  if (!event.request.url.startsWith("http")) return;
+  const url = new URL(event.request.url);
 
+  // Skip non-GET, non-http, and external/API/Firebase requests
+  if (
+    event.request.method !== "GET" ||
+    !event.request.url.startsWith("http") ||
+    url.hostname.includes("firestore.googleapis.com") ||
+    url.hostname.includes("firebase") ||
+    url.pathname.startsWith("/api")
+  ) {
+    return;
+  }
+
+  // 1. Navigation requests (HTML pages): Network-first with cache fallback
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+    );
+    return;
+  }
+
+  // 2. JavaScript / CSS: Network-first to always run latest compiled code without blank screen
+  if (
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".tsx") ||
+    url.pathname.endsWith(".ts") ||
+    url.pathname.startsWith("/@") ||
+    url.pathname.startsWith("/src/")
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // 3. Static Media / Icons: Cache-first with network fallback
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch fresh content in background (stale-while-revalidate pattern)
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          })
-          .catch(() => {});
         return cachedResponse;
       }
-
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== "basic") {
-            return networkResponse;
-          }
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-          return networkResponse;
-        })
-        .catch(() => {
-          return caches.match("/");
-        });
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic") {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+        }
+        return networkResponse;
+      });
     })
   );
 });
 
-// Background Sync Event (Satisfies Background Sync check)
+// Background Sync Event
 self.addEventListener("sync", (event) => {
   if (event.tag === "sync-records" || event.tag === "sync") {
-    console.log("Background sync event triggered:", event.tag);
-    event.waitUntil(
-      // We perform a simulated or real sync operation of database records
-      Promise.resolve().then(() => {
-        console.log("Student record database synchronization completed successfully.");
-      })
-    );
+    event.waitUntil(Promise.resolve());
   }
 });
 
-// Periodic Background Sync Event (Satisfies Periodic Sync check)
-self.addEventListener("periodicsync", (event) => {
-  if (event.tag === "sync-data" || event.tag === "periodic-sync") {
-    console.log("Periodic background sync event triggered:", event.tag);
-    event.waitUntil(
-      // Fetch updated student counts or notifications in the background
-      Promise.resolve().then(() => {
-        console.log("Periodic administrative data update completed successfully.");
-      })
-    );
-  }
-});
-
-// Push Notifications Event (Satisfies Web Push Notifications check)
+// Push Notifications Event
 self.addEventListener("push", (event) => {
   let data = {};
   if (event.data) {
@@ -122,26 +136,21 @@ self.addEventListener("push", (event) => {
     }
   };
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Notification Click Event (User interaction with Web Push)
+// Notification Click Event
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
   const targetUrl = event.notification.data ? event.notification.data.url : "/";
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // If there is an existing tab, navigate it and focus it
       for (let client of windowClients) {
         if (client.url === targetUrl && "focus" in client) {
           return client.focus();
         }
       }
-      // If no tab is open, open a new one
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
