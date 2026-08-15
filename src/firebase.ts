@@ -35,7 +35,7 @@ let initialDb: any;
 try {
   const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
   initialDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
   }, dbId);
 } catch (e) {
   console.warn("Failed to initialize firestore with custom database ID and long polling, falling back to default:", e);
@@ -65,18 +65,17 @@ export enum OperationType {
 
 let quotaExceededFlag = false;
 
+// Clear legacy persistent quota flag on startup
+try {
+  localStorage.removeItem('aiou_quota_exceeded');
+} catch (e) {}
+
 export function isQuotaExceeded(): boolean {
-  if (quotaExceededFlag) return true;
-  return localStorage.getItem('aiou_quota_exceeded') === 'true';
+  return quotaExceededFlag;
 }
 
 export function setQuotaExceeded(exceeded: boolean) {
   quotaExceededFlag = exceeded;
-  if (exceeded) {
-    localStorage.setItem('aiou_quota_exceeded', 'true');
-  } else {
-    localStorage.removeItem('aiou_quota_exceeded');
-  }
 }
 
 export function isQuotaError(error: unknown): boolean {
@@ -349,119 +348,108 @@ export async function saveStudentRecord(record: StudentRecord): Promise<void> {
 }
 
 /**
- * Asynchronously push unsynced or missing records to Cloud Firestore in non-blocking batches.
+ * Generic Bidirectional Sync Engine for all collections:
+ * 1. Fetches latest documents from Cloud Firestore.
+ * 2. Compares each record's updatedAt timestamp between Remote and Local.
+ * 3. Latest timestamp wins without destructive blind overwrites.
+ * 4. Pushes ONLY strictly newer local modifications to Cloud Firestore.
+ * 5. Updates Local Storage with the synchronized truth.
  */
-async function syncCollectionToCloud<T extends { id: string; updatedAt?: string; isDeleted?: boolean }>(
+async function syncCollectionBidirectional<T extends { id: string; updatedAt?: string; createdAt?: string; isDeleted?: boolean }>(
   collectionName: string,
-  mergedRecords: T[],
-  remoteRecords: T[]
-): Promise<void> {
-  if (isQuotaExceeded()) return;
+  getLocal: (includeDeleted?: boolean) => T[],
+  saveLocal: (items: T[]) => void,
+  sanitizeItem?: (item: any) => T
+): Promise<T[]> {
+  const deletedIds = getDeletedIds(collectionName);
+  const localItems = getLocal(true);
+  let remoteItems: T[] = [];
+  let cloudSuccess = false;
 
-  const remoteMap = new Map<string, T>();
-  remoteRecords.forEach(r => remoteMap.set(r.id, r));
-
-  const unSyncedRecords = mergedRecords.filter(record => {
-    if (record.isDeleted) return false;
-    const remote = remoteMap.get(record.id);
-    if (!remote) return true;
-    const recordTime = record.updatedAt ? new Date(record.updatedAt).getTime() : 0;
-    const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const safeRecordTime = isNaN(recordTime) ? 0 : recordTime;
-    const safeRemoteTime = isNaN(remoteTime) ? 0 : remoteTime;
-    return safeRecordTime > safeRemoteTime;
-  });
-
-  if (unSyncedRecords.length === 0) return;
-
-  const BATCH_SIZE = 5;
-  for (let i = 0; i < unSyncedRecords.length; i += BATCH_SIZE) {
-    if (isQuotaExceeded()) break;
-    const batch = unSyncedRecords.slice(i, i + BATCH_SIZE);
-    let batchQuotaError = false;
-
-    await Promise.allSettled(
-      batch.map(async (record) => {
-        try {
-          const docRef = doc(db, collectionName, record.id);
-          const cleanData = cleanObjectForFirestore(record);
-          await setDoc(docRef, cleanData);
-        } catch (err: any) {
-          if (err?.code === 'resource-exhausted' || err?.message?.includes('quota')) {
-            setQuotaExceeded(true);
-            batchQuotaError = true;
-          }
-        }
-      })
-    );
-
-    if (batchQuotaError) break;
-  }
-}
-
-/**
- * Fetch all records from Firestore and sync with Local Storage.
- * Supports forced cloud server fetch with strict network timeouts and instant local storage fallback.
- */
-export async function fetchAndSyncRecords(options?: { forceCloudFetch?: boolean }): Promise<StudentRecord[]> {
-  const deletedIds = getDeletedIds(COLLECTION_NAME);
-  let remoteRecords: StudentRecord[] = [];
-  
   try {
     await withTimeout(ensureAuthenticated(), 5000).catch(() => {});
+    const colRef = collection(db, collectionName);
     let querySnapshot;
-    const q = query(collection(db, COLLECTION_NAME), orderBy('updatedAt', 'desc'));
-
     try {
-      querySnapshot = await withTimeout(getDocsFromServer(q), 10000);
+      querySnapshot = await withTimeout(getDocs(colRef), 10000);
     } catch (e1) {
-      console.warn('getDocsFromServer failed or timed out, trying getDocs fallback:', e1);
-      querySnapshot = await withTimeout(getDocs(q), 10000);
+      console.warn(`Initial getDocs failed for ${collectionName}, retrying:`, e1);
+      querySnapshot = await getDocs(colRef);
     }
 
-    setQuotaExceeded(false); // Self-healing: clear quota flag on success
+    setQuotaExceeded(false); // Self-healing
+    cloudSuccess = true;
+
     querySnapshot.forEach((docSnap) => {
       const data = docSnap.data();
       if (data) {
-        const record = sanitizeStudentRecord(data);
-        if (record.isDeleted) {
-          remoteRecords.push(record);
-        } else if (deletedIds.includes(record.id)) {
-          remoteRecords.push({ ...record, isDeleted: true });
+        const item = sanitizeItem ? sanitizeItem(data) : (data as T);
+        if (item.isDeleted) {
+          remoteItems.push(item);
+        } else if (deletedIds.includes(item.id)) {
+          remoteItems.push({ ...item, isDeleted: true });
         } else {
-          remoteRecords.push(record);
+          remoteItems.push(item);
         }
       }
     });
   } catch (error) {
-    console.warn('Firestore load timed out or quota exceeded. Instantly reading local records.', error);
+    console.warn(`Firestore read failed for ${collectionName}. Reading local records only:`, error);
     setQuotaExceeded(true);
-    return getLocalRecords(false);
+    return localItems.filter(i => !i.isDeleted && !deletedIds.includes(i.id));
   }
 
-  // Merge remote records with local records
-  const localRecords = getLocalRecords(true);
-  const mergedMap = new Map<string, StudentRecord>();
+  if (!cloudSuccess) {
+    return localItems.filter(i => !i.isDeleted && !deletedIds.includes(i.id));
+  }
 
-  // Add local records first
-  localRecords.forEach(r => mergedMap.set(r.id, r));
+  const localMap = new Map<string, T>();
+  localItems.forEach(item => localMap.set(item.id, item));
 
-  // Overwrite/merge with remote records if they exist and are valid
-  remoteRecords.forEach(remote => {
-    const local = mergedMap.get(remote.id);
-    const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-    const safeRemoteTime = isNaN(remoteTime) ? 0 : remoteTime;
-    const safeLocalTime = isNaN(localTime) ? 0 : localTime;
+  const remoteMap = new Map<string, T>();
+  remoteItems.forEach(item => remoteMap.set(item.id, item));
 
-    if (!local || safeRemoteTime >= safeLocalTime) {
+  const mergedMap = new Map<string, T>();
+  const toUploadToCloud: T[] = [];
+
+  // 1. Process all remote records from Firestore
+  remoteItems.forEach(remote => {
+    const local = localMap.get(remote.id);
+    if (!local) {
+      // Exists in Cloud Firestore, not locally -> adopt Cloud version
       mergedMap.set(remote.id, remote);
+    } else {
+      const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+      const lTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+      const safeR = isNaN(rTime) ? 0 : rTime;
+      const safeL = isNaN(lTime) ? 0 : lTime;
+
+      if (safeR >= safeL) {
+        // Cloud has newer or equal version -> adopt Cloud version
+        mergedMap.set(remote.id, remote);
+      } else {
+        // Local has strictly newer version (e.g. offline modifications) -> keep local & queue upload
+        mergedMap.set(local.id, local);
+        if (!local.isDeleted) {
+          toUploadToCloud.push(local);
+        }
+      }
     }
   });
 
-  const mergedRecords = Array.from(mergedMap.values());
-  // Sort by updatedAt descending safely
-  mergedRecords.sort((a, b) => {
+  // 2. Process local items that don't exist on remote at all
+  localItems.forEach(local => {
+    if (!remoteMap.has(local.id) && !local.isDeleted && !deletedIds.includes(local.id)) {
+      // Include valid offline-created item and schedule upload to cloud
+      mergedMap.set(local.id, local);
+      toUploadToCloud.push(local);
+    }
+  });
+
+  const mergedItems = Array.from(mergedMap.values());
+
+  // Sort by updatedAt descending
+  mergedItems.sort((a, b) => {
     const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
     const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
     const valA = isNaN(tA) ? 0 : tA;
@@ -469,18 +457,39 @@ export async function fetchAndSyncRecords(options?: { forceCloudFetch?: boolean 
     return valB - valA;
   });
 
-  saveLocalRecords(mergedRecords);
+  // Save the full synchronized set locally
+  saveLocal(mergedItems);
 
-  // Background non-blocking sync to Firestore
-  syncCollectionToCloud(COLLECTION_NAME, mergedRecords, remoteRecords).catch(e => {
-    console.warn('Background Firestore push warning:', e);
-  });
-
-  const activeRecords = mergedRecords.filter(r => !r.isDeleted && !deletedIds.includes(r.id));
-  if (activeRecords.length === 0) {
-    return getLocalRecords(false);
+  // Push strictly newer local records to Cloud in non-blocking batches
+  if (toUploadToCloud.length > 0 && !isQuotaExceeded()) {
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < toUploadToCloud.length; i += BATCH_SIZE) {
+      const batch = toUploadToCloud.slice(i, i + BATCH_SIZE);
+      Promise.allSettled(
+        batch.map(item => {
+          const docRef = doc(db, collectionName, item.id);
+          const cleanData = cleanObjectForFirestore(item);
+          return withTimeout(setDoc(docRef, cleanData), 8000);
+        })
+      ).catch(e => console.warn(`Async background push for ${collectionName} warning:`, e));
+    }
   }
-  return activeRecords;
+
+  const activeItems = mergedItems.filter(i => !i.isDeleted && !deletedIds.includes(i.id));
+  return activeItems;
+}
+
+/**
+ * Fetch all records from Firestore and sync with Local Storage.
+ * Supports forced cloud server fetch with strict network timeouts and instant local storage fallback.
+ */
+export async function fetchAndSyncRecords(options?: { forceCloudFetch?: boolean }): Promise<StudentRecord[]> {
+  return syncCollectionBidirectional<StudentRecord>(
+    COLLECTION_NAME,
+    (includeDeleted) => getLocalRecords(includeDeleted ?? true),
+    (items) => saveLocalRecords(items),
+    sanitizeStudentRecord
+  );
 }
 
 /**
@@ -624,54 +633,11 @@ export async function saveExamManager(manager: ExamManager): Promise<void> {
 }
 
 export async function fetchAndSyncExamManagers(): Promise<ExamManager[]> {
-  const deletedIds = getDeletedIds(EXAM_MANAGERS_COLLECTION);
-  let remoteRecords: ExamManager[] = [];
-  try {
-    await ensureAuthenticated();
-    let querySnapshot;
-    try {
-      const q = query(collection(db, EXAM_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
-      querySnapshot = await getDocs(q);
-    } catch (e) {
-      console.warn('Fallback exam_managers query without orderBy:', e);
-      querySnapshot = await getDocs(collection(db, EXAM_MANAGERS_COLLECTION));
-    }
-    setQuotaExceeded(false); // Self-healing: clear quota flag on success
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as ExamManager;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for Exam Managers. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalExamManagers();
-  }
-
-  const local = getLocalExamManagers();
-  const mergedMap = new Map<string, ExamManager>();
-  local.forEach(m => mergedMap.set(m.id, m));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalExamManagers(merged);
-  syncCollectionToCloud(EXAM_MANAGERS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for Exam Managers:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<ExamManager>(
+    EXAM_MANAGERS_COLLECTION,
+    () => getLocalExamManagers(),
+    (items) => saveLocalExamManagers(items)
+  );
 }
 
 export async function deleteExamManager(id: string): Promise<void> {
@@ -724,54 +690,11 @@ export async function saveStudentExamInfo(record: StudentExamInfo): Promise<void
 }
 
 export async function fetchAndSyncStudentExamInfos(): Promise<StudentExamInfo[]> {
-  const deletedIds = getDeletedIds(EXAM_RECORDS_COLLECTION);
-  let remoteRecords: StudentExamInfo[] = [];
-  try {
-    await ensureAuthenticated();
-    let querySnapshot;
-    try {
-      const q = query(collection(db, EXAM_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
-      querySnapshot = await getDocs(q);
-    } catch (e) {
-      console.warn('Fallback exam_records query without orderBy:', e);
-      querySnapshot = await getDocs(collection(db, EXAM_RECORDS_COLLECTION));
-    }
-    setQuotaExceeded(false); // Self-healing: clear quota flag on success
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as StudentExamInfo;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for Student Exam Infos. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalExamRecords();
-  }
-
-  const local = getLocalExamRecords();
-  const mergedMap = new Map<string, StudentExamInfo>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalExamRecords(merged);
-  syncCollectionToCloud(EXAM_RECORDS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for Exam Records:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<StudentExamInfo>(
+    EXAM_RECORDS_COLLECTION,
+    () => getLocalExamRecords(),
+    (items) => saveLocalExamRecords(items)
+  );
 }
 
 export async function deleteStudentExamInfo(id: string): Promise<void> {
@@ -894,52 +817,15 @@ export async function saveStudentDegreeRecord(record: StudentDegreeRecord): Prom
 }
 
 export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeRecord[]> {
-  const deletedIds = getDeletedIds(DEGREE_RECORDS_COLLECTION);
-  let remoteRecords: StudentDegreeRecord[] = [];
-  try {
-    await ensureAuthenticated();
-    let querySnapshot;
-    try {
-      const q = query(collection(db, DEGREE_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
-      querySnapshot = await getDocs(q);
-    } catch (e) {
-      console.warn('Fallback degree_records query without orderBy:', e);
-      querySnapshot = await getDocs(collection(db, DEGREE_RECORDS_COLLECTION));
-    }
-
-    setQuotaExceeded(false); // Self-healing
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (data) {
-        const record = sanitizeStudentDegreeRecord(data);
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(docSnap.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for Student Degree Records. Reading local records only.', error);
-    setQuotaExceeded(true);
-  }
-
-  const local = getLocalDegreeRecords();
-  const mergedMap = new Map<string, StudentDegreeRecord>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  let merged = Array.from(mergedMap.values());
+  const result = await syncCollectionBidirectional<StudentDegreeRecord>(
+    DEGREE_RECORDS_COLLECTION,
+    () => getLocalDegreeRecords(),
+    (items) => saveLocalDegreeRecords(items),
+    sanitizeStudentDegreeRecord
+  );
 
   // Seed sample degree records if database & local storage are both empty
-  if (merged.length === 0 && localStorage.getItem('aiou_degree_seeded') !== 'true') {
+  if (result.length === 0 && localStorage.getItem('aiou_degree_seeded') !== 'true') {
     const samples = getSampleDegreeRecords();
     localStorage.setItem('aiou_degree_seeded', 'true');
     saveLocalDegreeRecords(samples);
@@ -953,13 +839,7 @@ export async function fetchAndSyncStudentDegreeRecords(): Promise<StudentDegreeR
     return samples;
   }
 
-  saveLocalDegreeRecords(merged);
-
-  syncCollectionToCloud(DEGREE_RECORDS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for Degree Records:', e);
-  });
-
-  return merged;
+  return result;
 }
 
 export async function deleteStudentDegreeRecord(id: string): Promise<void> {
@@ -1037,48 +917,11 @@ export async function saveStudentQuizRecord(record: StudentQuizRecord): Promise<
 }
 
 export async function fetchAndSyncStudentQuizRecords(): Promise<StudentQuizRecord[]> {
-  const deletedIds = getDeletedIds(QUIZ_RECORDS_COLLECTION);
-  let remoteRecords: StudentQuizRecord[] = [];
-  try {
-    await ensureAuthenticated();
-    const q = query(collection(db, QUIZ_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    setQuotaExceeded(false); // Self-healing
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as StudentQuizRecord;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for Student Quiz Records. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalQuizRecords();
-  }
-
-  const local = getLocalQuizRecords();
-  const mergedMap = new Map<string, StudentQuizRecord>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalQuizRecords(merged);
-  syncCollectionToCloud(QUIZ_RECORDS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for Quiz Records:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<StudentQuizRecord>(
+    QUIZ_RECORDS_COLLECTION,
+    () => getLocalQuizRecords(),
+    (items) => saveLocalQuizRecords(items)
+  );
 }
 
 export async function deleteStudentQuizRecord(id: string): Promise<void> {
@@ -1159,48 +1002,11 @@ export async function saveResearchProjectRecord(record: ResearchProjectRecord): 
 }
 
 export async function fetchAndSyncResearchProjectRecords(): Promise<ResearchProjectRecord[]> {
-  const deletedIds = getDeletedIds(RESEARCH_PROJECT_RECORDS_COLLECTION);
-  let remoteRecords: ResearchProjectRecord[] = [];
-  try {
-    await ensureAuthenticated();
-    const q = query(collection(db, RESEARCH_PROJECT_RECORDS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    setQuotaExceeded(false); // Self-healing
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as ResearchProjectRecord;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for Research Project Records. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalResearchProjectRecords();
-  }
-
-  const local = getLocalResearchProjectRecords();
-  const mergedMap = new Map<string, ResearchProjectRecord>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalResearchProjectRecords(merged);
-  syncCollectionToCloud(RESEARCH_PROJECT_RECORDS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for Research Projects:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<ResearchProjectRecord>(
+    RESEARCH_PROJECT_RECORDS_COLLECTION,
+    () => getLocalResearchProjectRecords(),
+    (items) => saveLocalResearchProjectRecords(items)
+  );
 }
 
 export async function deleteResearchProjectRecord(id: string): Promise<void> {
@@ -1281,48 +1087,11 @@ export async function saveExamManagerPaymentRecord(record: ExamManagerPaymentRec
 }
 
 export async function fetchAndSyncExamManagerPaymentRecords(): Promise<ExamManagerPaymentRecord[]> {
-  const deletedIds = getDeletedIds(EXAM_MANAGER_PAYMENTS_COLLECTION);
-  let remoteRecords: ExamManagerPaymentRecord[] = [];
-  try {
-    await ensureAuthenticated();
-    const q = query(collection(db, EXAM_MANAGER_PAYMENTS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    setQuotaExceeded(false); // Self-healing
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as ExamManagerPaymentRecord;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for Exam Manager Payment Records. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalExamManagerPaymentRecords();
-  }
-
-  const local = getLocalExamManagerPaymentRecords();
-  const mergedMap = new Map<string, ExamManagerPaymentRecord>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalExamManagerPaymentRecords(merged);
-  syncCollectionToCloud(EXAM_MANAGER_PAYMENTS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for Exam Manager Payments:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<ExamManagerPaymentRecord>(
+    EXAM_MANAGER_PAYMENTS_COLLECTION,
+    () => getLocalExamManagerPaymentRecords(),
+    (items) => saveLocalExamManagerPaymentRecords(items)
+  );
 }
 
 export async function deleteExamManagerPaymentRecord(id: string): Promise<void> {
@@ -1410,48 +1179,11 @@ export async function saveF2FManager(manager: F2FManager): Promise<void> {
 }
 
 export async function fetchAndSyncF2FManagers(): Promise<F2FManager[]> {
-  const deletedIds = getDeletedIds(F2F_MANAGERS_COLLECTION);
-  let remoteRecords: F2FManager[] = [];
-  try {
-    await ensureAuthenticated();
-    const q = query(collection(db, F2F_MANAGERS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    setQuotaExceeded(false);
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as F2FManager;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for F2F Managers. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalF2FManagers();
-  }
-
-  const local = getLocalF2FManagers();
-  const mergedMap = new Map<string, F2FManager>();
-  local.forEach(m => mergedMap.set(m.id, m));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalF2FManagers(merged);
-  syncCollectionToCloud(F2F_MANAGERS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for F2F Managers:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<F2FManager>(
+    F2F_MANAGERS_COLLECTION,
+    () => getLocalF2FManagers(),
+    (items) => saveLocalF2FManagers(items)
+  );
 }
 
 export async function deleteF2FManager(id: string): Promise<void> {
@@ -1525,48 +1257,11 @@ export async function saveF2FCandidate(record: F2FCandidateRecord): Promise<void
 }
 
 export async function fetchAndSyncF2FCandidates(): Promise<F2FCandidateRecord[]> {
-  const deletedIds = getDeletedIds(F2F_CANDIDATES_COLLECTION);
-  let remoteRecords: F2FCandidateRecord[] = [];
-  try {
-    await ensureAuthenticated();
-    const q = query(collection(db, F2F_CANDIDATES_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    setQuotaExceeded(false);
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as F2FCandidateRecord;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for F2F Candidates. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalF2FCandidates();
-  }
-
-  const local = getLocalF2FCandidates();
-  const mergedMap = new Map<string, F2FCandidateRecord>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalF2FCandidates(merged);
-  syncCollectionToCloud(F2F_CANDIDATES_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for F2F Candidates:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<F2FCandidateRecord>(
+    F2F_CANDIDATES_COLLECTION,
+    () => getLocalF2FCandidates(),
+    (items) => saveLocalF2FCandidates(items)
+  );
 }
 
 export async function deleteF2FCandidate(id: string): Promise<void> {
@@ -1640,48 +1335,11 @@ export async function saveF2FManagerPaymentRecord(record: F2FManagerPaymentRecor
 }
 
 export async function fetchAndSyncF2FManagerPaymentRecords(): Promise<F2FManagerPaymentRecord[]> {
-  const deletedIds = getDeletedIds(F2F_MANAGER_PAYMENTS_COLLECTION);
-  let remoteRecords: F2FManagerPaymentRecord[] = [];
-  try {
-    await ensureAuthenticated();
-    const q = query(collection(db, F2F_MANAGER_PAYMENTS_COLLECTION), orderBy('updatedAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    setQuotaExceeded(false);
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data) {
-        const record = data as F2FManagerPaymentRecord;
-        if (deletedIds.includes(record.id)) {
-          deleteDoc(doc.ref).catch(e => console.warn('Delayed firestore cleanup failed for', record.id, e));
-        } else {
-          remoteRecords.push(record);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Firestore load failed for F2F Manager Payments. Reading local records only.', error);
-    setQuotaExceeded(true);
-    return getLocalF2FManagerPaymentRecords();
-  }
-
-  const local = getLocalF2FManagerPaymentRecords();
-  const mergedMap = new Map<string, F2FManagerPaymentRecord>();
-  local.forEach(r => mergedMap.set(r.id, r));
-  remoteRecords.forEach(remote => {
-    const l = mergedMap.get(remote.id);
-    const rTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-    const lTime = (l && l.updatedAt) ? new Date(l.updatedAt).getTime() : 0;
-    if (!l || rTime >= lTime) {
-      mergedMap.set(remote.id, remote);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  saveLocalF2FManagerPaymentRecords(merged);
-  syncCollectionToCloud(F2F_MANAGER_PAYMENTS_COLLECTION, merged, remoteRecords).catch(e => {
-    console.warn('Background sync failed for F2F Manager Payments:', e);
-  });
-  return merged;
+  return syncCollectionBidirectional<F2FManagerPaymentRecord>(
+    F2F_MANAGER_PAYMENTS_COLLECTION,
+    () => getLocalF2FManagerPaymentRecords(),
+    (items) => saveLocalF2FManagerPaymentRecords(items)
+  );
 }
 
 export async function deleteF2FManagerPaymentRecord(id: string): Promise<void> {
@@ -1705,8 +1363,58 @@ export async function deleteF2FManagerPaymentRecord(id: string): Promise<void> {
 // MASTER BACKUP & SYSTEM SYNC HELPERS
 // ==========================================
 
+export async function forceUploadAllLocalToCloud(): Promise<number> {
+  let uploadedCount = 0;
+  try {
+    await ensureAuthenticated();
+    setQuotaExceeded(false);
+
+    // Push local student records to Cloud Firestore
+    const students = getLocalRecords(true).filter(r => !r.isDeleted);
+    if (students.length > 0) {
+      for (let i = 0; i < students.length; i += 10) {
+        const batch = students.slice(i, i + 10);
+        await Promise.allSettled(
+          batch.map(r => withTimeout(setDoc(doc(db, COLLECTION_NAME, r.id), cleanObjectForFirestore(r)), 8000))
+        );
+      }
+      uploadedCount = students.length;
+    }
+
+    // Push local degree records
+    const degrees = getLocalDegreeRecords();
+    if (degrees.length > 0) {
+      for (let i = 0; i < degrees.length; i += 10) {
+        const batch = degrees.slice(i, i + 10);
+        await Promise.allSettled(
+          batch.map(r => withTimeout(setDoc(doc(db, DEGREE_RECORDS_COLLECTION, r.id), cleanObjectForFirestore(r)), 8000))
+        );
+      }
+    }
+
+    // Push local exam records
+    const exams = getLocalExamRecords();
+    if (exams.length > 0) {
+      for (let i = 0; i < exams.length; i += 10) {
+        const batch = exams.slice(i, i + 10);
+        await Promise.allSettled(
+          batch.map(r => withTimeout(setDoc(doc(db, EXAM_RECORDS_COLLECTION, r.id), cleanObjectForFirestore(r)), 8000))
+        );
+      }
+    }
+  } catch (error) {
+    console.warn('forceUploadAllLocalToCloud encountered non-blocking errors:', error);
+  }
+  return uploadedCount;
+}
+
 export async function syncAllModulesToCloud(): Promise<void> {
   try {
+    setQuotaExceeded(false);
+    // First push any local records to Cloud Firestore
+    await forceUploadAllLocalToCloud().catch(() => {});
+
+    // Then re-fetch and sync all collections from Cloud
     await Promise.allSettled([
       fetchAndSyncRecords({ forceCloudFetch: true }),
       fetchAndSyncExamManagers(),

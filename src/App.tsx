@@ -122,9 +122,8 @@ export default function App() {
     setLoading(true);
     setSyncStatus('syncing');
     try {
-      if (forceCloud) {
-        await syncAllModulesToCloud();
-      }
+      // Always sync local records to Cloud Firestore on load so data transfers seamlessly between mobile and laptop
+      await syncAllModulesToCloud();
 
       // Fetch from Firebase and perform cloud verification to load all student records
       const synced = await fetchAndSyncRecords({ forceCloudFetch: forceCloud });
@@ -224,8 +223,43 @@ export default function App() {
   // Trigger loading records on mount or when logging in
   useEffect(() => {
     if (isLoggedIn) {
-      loadData();
+      loadData(true);
     }
+  }, [isLoggedIn]);
+
+  // Real-time automatic background synchronization across mobile and desktop
+  useEffect(() => {
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible' && isLoggedIn) {
+        syncAllModulesToCloud().then(() => {
+          fetchAndSyncRecords({ forceCloudFetch: true }).then(synced => {
+            const active = synced.filter(r => !r.isDeleted);
+            active.sort((a, b) => {
+              const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+              const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+              return tB - tA;
+            });
+            setRecords(active);
+            setSyncStatus('synced');
+          }).catch(() => setSyncStatus('failed'));
+        }).catch(() => {});
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleFocusOrVisible);
+    window.addEventListener('focus', handleFocusOrVisible);
+    window.addEventListener('online', handleFocusOrVisible);
+
+    const interval = setInterval(() => {
+      handleFocusOrVisible();
+    }, 25000);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleFocusOrVisible);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      window.removeEventListener('online', handleFocusOrVisible);
+      clearInterval(interval);
+    };
   }, [isLoggedIn]);
 
   // Centralized hook to keep selectedStudent state synchronized with records to avoid stale details views
