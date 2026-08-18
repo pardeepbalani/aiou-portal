@@ -30,17 +30,19 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore safely to prevent app startup crash if custom database is not yet fully provisioned
+// Initialize Firestore with force long-polling enabled to eliminate 10s streaming backend connection delays in proxies, sandboxes, and mobile networks
 let initialDb: any;
 try {
   const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
   initialDb = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   }, dbId);
 } catch (e) {
   console.warn("Failed to initialize firestore with custom database ID and long polling, falling back to default:", e);
   try {
-    initialDb = getFirestore(app);
+    initialDb = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
   } catch (err2) {
     console.error("Failed to initialize default firestore:", err2);
     // Create a safe dummy fallback object so module loads successfully and leverages local fallback
@@ -1585,8 +1587,9 @@ export async function deleteAllDemoStudentRecords(): Promise<{ count: number; me
 
     // Mark seeded flag to prevent automatic re-seeding
     localStorage.setItem('aiou_degree_seeded', 'true');
+    localStorage.setItem('aiou_demo_deleted', 'true');
 
-    // 1. Process Student Records
+    // 1. Process Student Records locally
     const localStudents = getLocalRecords(true);
     let deletedStudentCount = 0;
     const remainingStudents: StudentRecord[] = [];
@@ -1603,6 +1606,9 @@ export async function deleteAllDemoStudentRecords(): Promise<{ count: number; me
       if (isDemo) {
         deletedStudentCount++;
         addDeletedId(COLLECTION_NAME, record.id);
+        if (record.registrationId) {
+          addDeletedId(COLLECTION_NAME, record.registrationId);
+        }
         try {
           await deleteDoc(doc(db, COLLECTION_NAME, record.id));
         } catch (e) {
@@ -1613,9 +1619,36 @@ export async function deleteAllDemoStudentRecords(): Promise<{ count: number; me
       }
     }
 
+    // Also check Firestore directly for any remaining demo records
+    try {
+      await ensureAuthenticated();
+      const colRef = collection(db, COLLECTION_NAME);
+      const snap = await getDocs(colRef);
+      for (const d of snap.docs) {
+        const data = d.data() as any;
+        const isDemo = 
+          demoIds.has(d.id) ||
+          demoIds.has(data?.registrationId) ||
+          /^23FPA|^24SPA|^deg-sample-|^demo-|^sample-/i.test(d.id) ||
+          (data?.registrationId && /^23FPA|^24SPA/i.test(data.registrationId)) ||
+          (data?.remarks && typeof data.remarks === 'string' && data.remarks.includes('AIOU Student record #'));
+        
+        if (isDemo) {
+          addDeletedId(COLLECTION_NAME, d.id);
+          try {
+            await deleteDoc(doc(db, COLLECTION_NAME, d.id));
+          } catch (e) {
+            console.warn(`Firestore direct delete error for ${d.id}:`, e);
+          }
+        }
+      }
+    } catch (errSnap) {
+      console.warn("Firestore scan during demo delete warning:", errSnap);
+    }
+
     saveLocalRecords(remainingStudents);
 
-    // 2. Process Degree Records
+    // 2. Process Degree Records locally & remote
     const localDegrees = getLocalDegreeRecords();
     let deletedDegreeCount = 0;
     const remainingDegrees: StudentDegreeRecord[] = [];
@@ -1639,6 +1672,32 @@ export async function deleteAllDemoStudentRecords(): Promise<{ count: number; me
       } else {
         remainingDegrees.push(deg);
       }
+    }
+
+    try {
+      await ensureAuthenticated();
+      const degColRef = collection(db, DEGREE_RECORDS_COLLECTION);
+      const degSnap = await getDocs(degColRef);
+      for (const d of degSnap.docs) {
+        const data = d.data() as any;
+        const isDemo = 
+          demoIds.has(d.id) ||
+          demoIds.has(data?.studentId) ||
+          /^deg-sample-|^demo-|^sample-|^23FPA|^24SPA/i.test(d.id) ||
+          (data?.studentId && /^23FPA|^24SPA/i.test(data.studentId)) ||
+          data?.studentName === 'Ahmad Khan' || data?.studentName === 'Sana Fatima' || data?.studentName === 'Muhammad Ali';
+
+        if (isDemo) {
+          addDeletedId(DEGREE_RECORDS_COLLECTION, d.id);
+          try {
+            await deleteDoc(doc(db, DEGREE_RECORDS_COLLECTION, d.id));
+          } catch (e) {
+            console.warn(`Firestore direct delete error for degree ${d.id}:`, e);
+          }
+        }
+      }
+    } catch (errDegSnap) {
+      console.warn("Firestore degree scan during demo delete warning:", errDegSnap);
     }
 
     saveLocalDegreeRecords(remainingDegrees);

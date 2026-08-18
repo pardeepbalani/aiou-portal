@@ -12,6 +12,7 @@ import QuizMgtModule from './components/QuizMgtModule';
 import SemesterCourseCodesModule from './components/SemesterCourseCodesModule';
 import ResearchProjectModule from './components/ResearchProjectModule';
 import F2FWorkshopModule from './components/F2FWorkshopModule';
+import DeleteDemoModal from './components/DeleteDemoModal';
 
 import { StudentRecord, PROGRAM_OPTIONS, PROGRAM_SEMESTERS_MAP } from './types';
 import { 
@@ -59,6 +60,10 @@ export default function App() {
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
+
+  // Demo delete modal state
+  const [showDeleteDemoModal, setShowDeleteDemoModal] = useState<boolean>(false);
+  const [isDeletingDemo, setIsDeletingDemo] = useState<boolean>(false);
 
   // Sync preference
   useEffect(() => {
@@ -203,20 +208,24 @@ export default function App() {
     }
   };
 
-  const handleDeleteDemoRecords = async () => {
-    if (window.confirm('Are you sure you want to delete all demo/sample student records? Real student records will not be affected.')) {
-      setLoading(true);
-      setSyncStatus('syncing');
-      try {
-        const res = await deleteAllDemoStudentRecords();
-        alert(res.message);
-        await loadData(true);
-      } catch (err: any) {
-        alert('Failed to delete demo records: ' + (err?.message || err));
-        setSyncStatus('failed');
-      } finally {
-        setLoading(false);
-      }
+  const handleDeleteDemoRecords = () => {
+    setShowDeleteDemoModal(true);
+  };
+
+  const handleConfirmDeleteDemoRecords = async () => {
+    setIsDeletingDemo(true);
+    setLoading(true);
+    setSyncStatus('syncing');
+    try {
+      const res = await deleteAllDemoStudentRecords();
+      setShowDeleteDemoModal(false);
+      await loadData(true);
+    } catch (err: any) {
+      console.error('Failed to delete demo records:', err);
+      setSyncStatus('failed');
+    } finally {
+      setIsDeletingDemo(false);
+      setLoading(false);
     }
   };
 
@@ -644,6 +653,14 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Delete Demo Records Confirmation Modal */}
+      <DeleteDemoModal
+        isOpen={showDeleteDemoModal}
+        onClose={() => setShowDeleteDemoModal(false)}
+        onConfirm={handleConfirmDeleteDemoRecords}
+        isLoading={isDeletingDemo}
+      />
 
     </div>
   );
